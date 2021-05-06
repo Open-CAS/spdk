@@ -44,12 +44,23 @@ extern ocf_ctx_t vbdev_ocf_ctx;
 
 #define SPDK_OBJECT 1
 
+struct ocf_persistent_meta_zone {
+	int fd;
+	size_t size;
+	char name[NAME_MAX];
+	void *data;
+};
+
+#define MAX_PERSISTENT_ZONES 2
+
 /* Context of cache instance */
 struct vbdev_ocf_cache_ctx {
 	ocf_queue_t                  mngt_queue;
 	ocf_queue_t                  cleaner_queue;
 	pthread_mutex_t              lock;
 	env_atomic                   refcnt;
+	char cache_name[OCF_CACHE_NAME_SIZE];
+	struct ocf_persistent_meta_zone    persistent_meta[MAX_PERSISTENT_ZONES];
 };
 
 void vbdev_ocf_cache_ctx_put(struct vbdev_ocf_cache_ctx *ctx);

@@ -30,6 +30,12 @@
  *   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  *   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+
 #include <ocf/ocf.h>
 #include <execinfo.h>
 
@@ -533,6 +539,172 @@ vbdev_ocf_ctx_log_printf(ocf_logger_t logger, ocf_logger_lvl_t lvl,
 	return 0;
 }
 
+struct ocf_cache_persistent_meta_segment_descriptor {
+	int id;
+
+	bool valid;
+	size_t size;
+	size_t offset;
+};
+
+#define MAX_SEGMENTS 20
+struct shm_superblock {
+	struct ocf_cache_persistent_meta_segment_descriptor segments[MAX_SEGMENTS];
+};
+
+
+static ocf_persistent_meta_zone_t
+vbdev_ocf_persistent_meta_init(ocf_cache_t cache, size_t size, bool *load)
+{
+	struct vbdev_ocf_cache_ctx *ctx = ocf_cache_get_priv(cache);
+	struct ocf_persistent_meta_zone *pmeta;
+	struct stat stat_buf;
+	void *shm;
+	struct shm_superblock *shm_sb;
+	int zone;
+
+	for (zone = 0; zone < MAX_PERSISTENT_ZONES; zone++) {
+		if (!ctx->persistent_meta[zone].fd)
+			break;
+	}
+
+	if (zone >= MAX_PERSISTENT_ZONES)
+		return NULL;
+
+
+	pmeta = &ctx->persistent_meta[zone];
+	*load = false;
+
+	snprintf(pmeta->name, NAME_MAX, "/ocf.%s.%u", ctx->cache_name, zone);
+
+	pmeta->fd = shm_open(pmeta->name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
+	if (pmeta->fd < 0) {
+		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL, "Can't open SHM %s\n",
+				pmeta->name);
+		return NULL;
+	}
+
+	if (fstat(pmeta->fd, &stat_buf) < 0) {
+		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL, "Can't stat SHM %s\n",
+				pmeta->name);
+		return NULL;
+	}
+
+	if (stat_buf.st_size != 0) {
+		*load = true;
+		spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL, "Loading from SHM\n");
+		if (stat_buf.st_size < size) {
+			if (ftruncate(pmeta->fd, size) < 0) {
+				spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
+						"Failed to extend SHM\n");
+				return NULL;
+			}
+			pmeta->size = size;
+		} else if (stat_buf.st_size == size) {
+			pmeta->size = size;
+		} else {
+			spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL,
+					"Refusing to shrink SHM\n");
+			pmeta->size = stat_buf.st_size;
+		}
+	} else {
+		spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL,
+				"Truncate new SHM\n");
+		if (ftruncate(pmeta->fd, size) < 0)
+			return NULL;
+
+		pmeta->size = size;
+	}
+
+	shm = mmap(NULL, pmeta->size, PROT_READ | PROT_WRITE, MAP_SHARED, pmeta->fd, 0);
+	if (shm == MAP_FAILED) {
+		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
+				"Failed to map shm\n");
+		return NULL;
+	}
+
+	if (mlock(shm, pmeta->size)) {
+		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
+				"Failed to mlock\n");
+
+		return NULL;
+	}
+
+	pmeta->data = shm;
+	shm_sb = shm;
+
+	if (!*load) {
+		shm_sb->segments[0].size = sizeof(struct shm_superblock);
+		shm_sb->segments[0].offset = 0;
+		shm_sb->segments[0].id = -1;
+		shm_sb->segments[0].valid = true;
+	}
+
+	return pmeta;
+}
+
+static int
+vbdev_ocf_persistent_meta_deinit(struct ocf_persistent_meta_zone *zone)
+{
+	/*
+	munmap(zone->data, zone->size);
+	close(zone->fd);
+	shm_unlink(zone->name);
+	*/
+
+	return 0;
+}
+
+static void *
+vbdev_ocf_persistent_meta_alloc(struct ocf_persistent_meta_zone *zone, size_t size,
+		int alloc_id, bool *load)
+{
+	int i;
+	size_t sum = 0;
+	struct shm_superblock *shm_sb = zone->data;
+	struct ocf_cache_persistent_meta_segment_descriptor *desc =
+		shm_sb->segments;
+
+	alloc_id++;
+	*load = false;
+
+	for (i = 0; i < MAX_SEGMENTS; i++) {
+		/* assume no fragmentation */
+		if (!desc[i].valid)
+			break;
+
+		sum += desc[i].size;
+
+		/* assume no size change */
+		if (desc[i].id == alloc_id) {
+			*load = true;
+			return zone->data + desc[i].offset;
+		}
+	}
+
+	if (i == MAX_SEGMENTS)
+		return NULL;
+
+	 /* TODO: align */
+
+	if (sum + size > zone->size)
+		return NULL;
+
+	desc[i].id = alloc_id;
+	desc[i].offset = sum;
+	desc[i].size = size;
+	desc[i].valid = true;
+
+	return zone->data + desc[i].offset;
+}
+
+static int
+vbdev_ocf_persistent_meta_free(struct ocf_persistent_meta_zone *zone, int alloc_id,
+		void *ptr)
+{
+	return 0;
+}
+
 static const struct ocf_ctx_config vbdev_ocf_ctx_cfg = {
 	.name = "OCF SPDK",
 
@@ -554,6 +726,13 @@ static const struct ocf_ctx_config vbdev_ocf_ctx_cfg = {
 			.init = vbdev_ocf_volume_updater_init,
 			.stop = vbdev_ocf_volume_updater_stop,
 			.kick = vbdev_ocf_volume_updater_kick,
+		},
+
+		.persistent_meta = {
+			.init = vbdev_ocf_persistent_meta_init,
+			.deinit = vbdev_ocf_persistent_meta_deinit,
+			.alloc = vbdev_ocf_persistent_meta_alloc,
+			.free = vbdev_ocf_persistent_meta_free,
 		},
 
 		.cleaner = {

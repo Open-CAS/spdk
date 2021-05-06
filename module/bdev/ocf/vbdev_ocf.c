@@ -744,9 +744,9 @@ vbdev_ocf_dump_info_json(void *opaque, struct spdk_json_write_ctx *w)
 	spdk_json_write_named_string(w, "mode",
 				     ocf_get_cache_modename(ocf_cache_get_mode(vbdev->ocf_cache)));
 	spdk_json_write_named_uint32(w, "cache_line_size",
-				     ocf_get_cache_line_size(vbdev->ocf_cache));
-	spdk_json_write_named_bool(w, "metadata_volatile",
-				   vbdev->cfg.cache.metadata_volatile);
+				     ocf_cache_get_line_size(vbdev->ocf_cache));
+	spdk_json_write_named_uint32(w, "metadata_persistence_mode",
+				   vbdev->cfg.cache.persistence_mode);
 
 	return 0;
 }
@@ -1164,15 +1164,17 @@ start_cache(struct vbdev_ocf *vbdev)
 	vbdev_ocf_cache_ctx_get(vbdev->cache_ctx);
 	pthread_mutex_init(&vbdev->cache_ctx->lock, NULL);
 
-	rc = ocf_mngt_cache_start(vbdev_ocf_ctx, &vbdev->ocf_cache, &vbdev->cfg.cache);
+	env_strncpy(vbdev->cache_ctx->cache_name, OCF_CACHE_NAME_SIZE,
+			vbdev->cfg.cache.name, OCF_CACHE_NAME_SIZE);
+
+	rc = ocf_mngt_cache_start(vbdev_ocf_ctx, &vbdev->ocf_cache,
+			&vbdev->cfg.cache, vbdev->cache_ctx);
 	if (rc) {
 		SPDK_ERRLOG("Could not start cache %s: %d\n", vbdev->name, rc);
 		vbdev_ocf_mngt_exit(vbdev, unregister_path_dirty, rc);
 		return;
 	}
 	ocf_mngt_cache_get(vbdev->ocf_cache);
-
-	ocf_cache_set_priv(vbdev->ocf_cache, vbdev->cache_ctx);
 
 	rc = create_management_queue(vbdev);
 	if (rc) {
@@ -1229,7 +1231,7 @@ init_vbdev_config(struct vbdev_ocf *vbdev)
 
 	/* TODO [metadata]: make configurable with persistent
 	 * metadata support */
-	cfg->cache.metadata_volatile = false;
+	cfg->cache.persistence_mode = ocf_metadata_persistence_persistent;
 
 	/* This are suggested values that
 	 * should be sufficient for most use cases */
@@ -1618,6 +1620,9 @@ vbdev_ocf_examine_disk(struct spdk_bdev *bdev)
 {
 	const char *bdev_name = spdk_bdev_get_name(bdev);
 	struct vbdev_ocf *vbdev;
+
+	if (getenv("ocf_force"))
+		return;
 
 	examine_start(bdev);
 

@@ -563,6 +563,8 @@ vbdev_ocf_persistent_meta_init(ocf_cache_t cache, size_t size, bool *load)
 	struct shm_superblock *shm_sb;
 	int zone;
 
+	size += sizeof(struct shm_superblock);
+
 	for (zone = 0; zone < MAX_PERSISTENT_ZONES; zone++) {
 		if (!ctx->persistent_meta[zone].fd)
 			break;

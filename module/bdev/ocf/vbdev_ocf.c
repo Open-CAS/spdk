@@ -1161,6 +1161,9 @@ start_cache(struct vbdev_ocf *vbdev)
 		return;
 	}
 
+	vbdev->cache_ctx->create = !vbdev->cfg.loadq;
+	vbdev->cache_ctx->force = vbdev->cfg.device.force;
+
 	vbdev_ocf_cache_ctx_get(vbdev->cache_ctx);
 	pthread_mutex_init(&vbdev->cache_ctx->lock, NULL);
 

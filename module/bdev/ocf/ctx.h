@@ -59,6 +59,8 @@ struct vbdev_ocf_cache_ctx {
 	ocf_queue_t                  cleaner_queue;
 	pthread_mutex_t              lock;
 	env_atomic                   refcnt;
+	bool                         create;
+	bool                         force;
 	char cache_name[OCF_CACHE_NAME_SIZE];
 	struct ocf_persistent_meta_zone    persistent_meta[MAX_PERSISTENT_ZONES];
 };

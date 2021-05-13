@@ -565,6 +565,9 @@ vbdev_ocf_persistent_meta_init(ocf_cache_t cache, size_t size, bool *load)
 
 	size += sizeof(struct shm_superblock);
 
+	if (!ctx->create && ctx->force)
+		return NULL;
+
 	for (zone = 0; zone < MAX_PERSISTENT_ZONES; zone++) {
 		if (!ctx->persistent_meta[zone].fd)
 			break;
@@ -581,59 +584,69 @@ vbdev_ocf_persistent_meta_init(ocf_cache_t cache, size_t size, bool *load)
 
 	pmeta->fd = shm_open(pmeta->name, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR);
 	if (pmeta->fd < 0) {
-		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL, "Can't open SHM %s\n",
-				pmeta->name);
+		SPDK_ERRLOG("Can't open SHM %s\n", pmeta->name);
 		return NULL;
 	}
 
-	if (fstat(pmeta->fd, &stat_buf) < 0) {
-		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL, "Can't stat SHM %s\n",
+	if (ctx->force) {
+		SPDK_NOTICELOG("Using force, truncating SHM %s\n",
 				pmeta->name);
-		return NULL;
+		if (ftruncate(pmeta->fd, 0) < 0) {
+			SPDK_ERRLOG("Failed to truncate\n");
+			goto err_stat;
+		}
+
+	} else if (fstat(pmeta->fd, &stat_buf) < 0) {
+		SPDK_ERRLOG("Can't stat SHM %s\n", pmeta->name);
+		goto err_stat;
 	}
 
-	if (stat_buf.st_size != 0) {
+	if (!ctx->force && stat_buf.st_size != 0) {
+		if (ctx->create) {
+			SPDK_ERRLOG("SHM %s found, but no force specified!\n",
+					pmeta->name);
+			goto err_stat;
+		}
+
 		*load = true;
-		spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL, "Loading from SHM\n");
+		SPDK_NOTICELOG("Loading from SHM\n");
 		if (stat_buf.st_size < size) {
 			if (ftruncate(pmeta->fd, size) < 0) {
-				spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
-						"Failed to extend SHM\n");
-				return NULL;
+				SPDK_ERRLOG("Failed to extend SHM\n");
+				goto err_stat;
 			}
 			pmeta->size = size;
 		} else if (stat_buf.st_size == size) {
 			pmeta->size = size;
 		} else {
-			spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL,
-					"Refusing to shrink SHM\n");
+			SPDK_NOTICELOG("Refusing to shrink SHM\n");
 			pmeta->size = stat_buf.st_size;
 		}
 	} else {
-		spdk_log(SPDK_LOG_NOTICE, NULL, -1, NULL,
-				"Truncate new SHM\n");
-		if (ftruncate(pmeta->fd, size) < 0)
-			return NULL;
+		SPDK_NOTICELOG("Set SHM size\n");
+		if (ftruncate(pmeta->fd, size) < 0) {
+			SPDK_ERRLOG("Failed to truncate\n");
+			goto err_stat;
+		}
 
 		pmeta->size = size;
 	}
 
 	shm = mmap(NULL, pmeta->size, PROT_READ | PROT_WRITE, MAP_SHARED, pmeta->fd, 0);
 	if (shm == MAP_FAILED) {
-		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
-				"Failed to map shm\n");
-		return NULL;
-	}
-
-	if (mlock(shm, pmeta->size)) {
-		spdk_log(SPDK_LOG_ERROR, NULL, -1, NULL,
-				"Failed to mlock\n");
-
-		return NULL;
+		SPDK_ERRLOG("Failed to map shm\n");
+		goto err_stat;
 	}
 
 	pmeta->data = shm;
 	shm_sb = shm;
+
+	if (mlock(shm, pmeta->size)) {
+		SPDK_ERRLOG("Failed to mlock\n");
+
+		goto err_mlock;
+	}
+
 
 	if (!*load) {
 		shm_sb->segments[0].size = sizeof(struct shm_superblock);
@@ -643,6 +656,14 @@ vbdev_ocf_persistent_meta_init(ocf_cache_t cache, size_t size, bool *load)
 	}
 
 	return pmeta;
+
+err_mlock:
+	munlock(pmeta->data, pmeta->size);
+err_stat:
+	close(pmeta->fd);
+	shm_unlink(pmeta->name);
+
+	return NULL;
 }
 
 static int

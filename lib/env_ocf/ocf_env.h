@@ -185,6 +185,9 @@ typedef struct {
 	size_t element_size;
 } env_allocator;
 
+env_allocator *env_allocator_create_extended(uint32_t size, const char *name,
+		int limit);
+
 env_allocator *env_allocator_create(uint32_t size, const char *name);
 
 void env_allocator_destroy(env_allocator *allocator);

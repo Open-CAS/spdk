@@ -64,6 +64,12 @@ env_allocator_new(env_allocator *allocator)
 env_allocator *
 env_allocator_create(uint32_t size, const char *name)
 {
+	return env_allocator_create_extended(size, name, -1);
+}
+
+env_allocator *
+env_allocator_create_extended(uint32_t size, const char *name, int limit)
+{
 	env_allocator *allocator;
 	char qualified_name[128] = {0};
 
@@ -76,7 +82,7 @@ env_allocator_create(uint32_t size, const char *name)
 
 	allocator->mempool = spdk_mempool_create(qualified_name,
 			     ENV_ALLOCATOR_NBUFS, size,
-			     SPDK_MEMPOOL_DEFAULT_CACHE_SIZE,
+			     limit < 0 ? SPDK_MEMPOOL_DEFAULT_CACHE_SIZE : limit,
 			     SPDK_ENV_SOCKET_ID_ANY);
 
 	if (!allocator->mempool) {

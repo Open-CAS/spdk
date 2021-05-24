@@ -81,7 +81,8 @@ struct env_mpool *env_mpool_create(uint32_t hdr_size, uint32_t elem_size,
 
 		size = hdr_size + (elem_size * (1 << i));
 
-		mpool->allocator[i] = env_allocator_create(size, name);
+		mpool->allocator[i] = env_allocator_create_extended(size, name,
+				limits ? limits[i] : -1);
 
 		if (!mpool->allocator[i])
 				goto err;

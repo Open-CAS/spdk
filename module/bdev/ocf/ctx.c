@@ -40,29 +40,7 @@
 #include "data.h"
 
 ocf_ctx_t vbdev_ocf_ctx;
-
-static ctx_data_t *
-vbdev_ocf_ctx_data_alloc(uint32_t pages)
-{
-	struct bdev_ocf_data *data;
-	void *buf;
-	uint32_t sz;
-
-	data = vbdev_ocf_data_alloc(1);
-
-	sz = pages * PAGE_SIZE;
-	buf = spdk_malloc(sz, PAGE_SIZE, NULL,
-			  SPDK_ENV_LCORE_ID_ANY, SPDK_MALLOC_DMA);
-	if (buf == NULL) {
-		return NULL;
-	}
-
-	vbdev_ocf_iovs_add(data, buf, sz);
-
-	data->size = sz;
-
-	return data;
-}
+env_allocator *ocf_data_allocator;
 
 static void
 vbdev_ocf_ctx_data_free(ctx_data_t *ctx_data)
@@ -75,10 +53,37 @@ vbdev_ocf_ctx_data_free(ctx_data_t *ctx_data)
 	}
 
 	for (i = 0; i < data->iovcnt; i++) {
-		spdk_free(data->iovs[i].iov_base);
+		env_allocator_del(ocf_data_allocator, data->iovs[i].iov_base);
 	}
 
 	vbdev_ocf_data_free(data);
+}
+
+static ctx_data_t *
+vbdev_ocf_ctx_data_alloc(uint32_t pages)
+{
+	struct bdev_ocf_data *data;
+	void *buf;
+	uint32_t i;
+
+	data = vbdev_ocf_data_alloc(pages);
+	if (!data)
+		return NULL;
+
+	for (i = 0; i < pages; i++) {
+		buf = env_allocator_new(ocf_data_allocator);
+
+		if (buf == NULL) {
+			vbdev_ocf_ctx_data_free(data);
+			return NULL;
+		}
+
+		vbdev_ocf_iovs_add(data, buf, PAGE_SIZE);
+	}
+
+	data->size = pages * PAGE_SIZE;
+
+	return data;
 }
 
 static int
@@ -557,6 +562,11 @@ vbdev_ocf_ctx_init(void)
 		return ret;
 	}
 
+	ocf_data_allocator = env_allocator_create(PAGE_SIZE, "ocf_data");
+	if (!ocf_data_allocator) {
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -565,4 +575,7 @@ vbdev_ocf_ctx_cleanup(void)
 {
 	ocf_ctx_put(vbdev_ocf_ctx);
 	vbdev_ocf_ctx = NULL;
+
+	env_allocator_destroy(ocf_data_allocator);
+	ocf_data_allocator = NULL;
 }

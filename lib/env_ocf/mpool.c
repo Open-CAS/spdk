@@ -64,6 +64,7 @@ struct env_mpool *env_mpool_create(uint32_t hdr_size, uint32_t elem_size,
 	char name[RTE_MEMPOOL_NAMESIZE] = {};
 	int ret;
 	int size;
+	bool create;
 
 	struct env_mpool *mpool = env_zalloc(sizeof(struct env_mpool), ENV_MEM_NOIO);
 	if (!mpool)
@@ -81,10 +82,17 @@ struct env_mpool *env_mpool_create(uint32_t hdr_size, uint32_t elem_size,
 
 		size = hdr_size + (elem_size * (1 << i));
 
-		mpool->allocator[i] = env_allocator_create_extended(size, name,
-				limits ? limits[i] : -1);
+		create = false;
+		if (limits && limits[i]) {
+			mpool->allocator[i] = env_allocator_create_extended(size,
+					name, limits[i]);
+			create = true;
+		} else if (!limits) {
+			mpool->allocator[i] = env_allocator_create(size, name);
+			create = true;
+		}
 
-		if (!mpool->allocator[i])
+		if (create && !mpool->allocator[i])
 				goto err;
 	}
 

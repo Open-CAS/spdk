@@ -183,6 +183,7 @@ static inline uint64_t env_get_free_memory(void)
 typedef struct {
 	struct spdk_mempool *mempool;
 	size_t element_size;
+	size_t element_count;
 } env_allocator;
 
 env_allocator *env_allocator_create_extended(uint32_t size, const char *name,

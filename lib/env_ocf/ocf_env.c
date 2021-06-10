@@ -49,16 +49,44 @@
 /* Use unique index for env allocators */
 static env_atomic g_env_allocator_index = 0;
 
+struct _env_allocator_item {
+	uint8_t from_malloc : 1;
+
+	char data[] __attribute__ ((aligned (__alignof__(uint64_t))));
+};
+
 void *
 env_allocator_new(env_allocator *allocator)
 {
-	void *mem = spdk_mempool_get(allocator->mempool);
+	struct _env_allocator_item *item = spdk_mempool_get(allocator->mempool);
 
-	if (spdk_likely(mem)) {
-		memset(mem, 0, allocator->element_size);
+	if (spdk_likely(item)) {
+		item->from_malloc = 0;
+	} else {
+		item = spdk_malloc(allocator->element_size, 0, NULL,
+				SPDK_ENV_SOCKET_ID_ANY, SPDK_MALLOC_DMA);
+		if (!item)
+			return NULL;
+		item->from_malloc = 1;
 	}
 
-	return mem;
+	if (spdk_likely(item)) {
+		memset(item->data, 0, allocator->element_size -
+				sizeof(struct _env_allocator_item));
+	}
+
+	return &item->data;
+}
+
+void
+env_allocator_del(env_allocator *allocator, void *ptr)
+{
+	struct _env_allocator_item *item = container_of(ptr, struct _env_allocator_item, data);
+
+	if (spdk_likely(!item->from_malloc))
+		spdk_mempool_put(allocator->mempool, item);
+	else
+		spdk_free(item);
 }
 
 env_allocator *
@@ -79,9 +107,11 @@ env_allocator_create_extended(uint32_t size, const char *name, int limit)
 	if (!allocator) {
 		return NULL;
 	}
+	allocator->element_size = size + sizeof(struct _env_allocator_item);
+	allocator->element_count = ENV_ALLOCATOR_NBUFS;
 
 	allocator->mempool = spdk_mempool_create(qualified_name,
-			     ENV_ALLOCATOR_NBUFS, size,
+			     allocator->element_count, allocator->element_size,
 			     limit < 0 ? SPDK_MEMPOOL_DEFAULT_CACHE_SIZE : limit,
 			     SPDK_ENV_SOCKET_ID_ANY);
 
@@ -91,22 +121,15 @@ env_allocator_create_extended(uint32_t size, const char *name, int limit)
 		return NULL;
 	}
 
-	allocator->element_size = size;
-
 	return allocator;
-}
-
-void
-env_allocator_del(env_allocator *allocator, void *item)
-{
-	spdk_mempool_put(allocator->mempool, item);
 }
 
 void
 env_allocator_destroy(env_allocator *allocator)
 {
 	if (allocator) {
-		if (ENV_ALLOCATOR_NBUFS - spdk_mempool_count(allocator->mempool)) {
+		if (allocator->element_count -
+				spdk_mempool_count(allocator->mempool)) {
 			SPDK_ERRLOG("Not all objects deallocated\n");
 			assert(false);
 		}

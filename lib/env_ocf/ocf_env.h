@@ -54,6 +54,8 @@
 #include "ocf_env_list.h"
 #include "ocf/ocf_err.h"
 
+#include "mpool.h"
+
 typedef uint8_t u8;
 typedef uint16_t u16;
 typedef uint32_t u32;

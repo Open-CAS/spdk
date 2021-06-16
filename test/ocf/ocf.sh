@@ -5,6 +5,7 @@ rootdir=$(readlink -f $testdir/../..)
 
 source $rootdir/test/common/autotest_common.sh
 
+run_test "ocf_alru_parameters" "$testdir/alru/alru-parameters.sh"
 run_test "ocf_fio_modes" "$testdir/integrity/fio-modes.sh"
 run_test "ocf_bdevperf_iotypes" "$testdir/integrity/bdevperf-iotypes.sh"
 run_test "ocf_stats" "$testdir/integrity/stats.sh"

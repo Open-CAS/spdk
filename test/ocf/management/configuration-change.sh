@@ -52,6 +52,11 @@ for cache_mode in "${cache_modes[@]}"; do
 		".config | .[] | select(.method == \"bdev_ocf_create\") | .params.mode == \"$cache_mode\""
 done
 
+# Change cleaning policy and parameters
+$rpc_py bdev_ocf_set_cleaning_alru Cache0 -w 1000 -s 1000 -b 1000 -t 1000
+$rpc_py bdev_ocf_set_cleaning_acp Cache0 -w 1000 -b 1000
+$rpc_py bdev_ocf_set_cleaning_nop Cache0
+
 # Change sequential cutoff
 $rpc_py bdev_ocf_set_seqcutoff Cache0 -p always -t 64
 $rpc_py bdev_ocf_set_seqcutoff Cache0 -p never -t 16

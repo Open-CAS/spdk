@@ -189,6 +189,12 @@ struct vbdev_ocf {
 	TAILQ_ENTRY(vbdev_ocf)       tailq;
 };
 
+/* Context for switching cleaning policy and parameters */
+struct cleaning_ctx {
+	struct spdk_jsonrpc_request *request;
+	struct vbdev_ocf *vbdev;
+};
+
 void vbdev_ocf_construct(
 	const char *vbdev_name,
 	const char *cache_mode_name,
@@ -216,6 +222,27 @@ void vbdev_ocf_set_cache_mode(
 	const char *cache_mode_name,
 	void (*cb)(int, struct vbdev_ocf *, void *),
 	void *cb_arg);
+
+/* Set ALRU cleaning policy with parameters on OCF cache */
+void vbdev_ocf_set_cleaning_alru(
+	int32_t wake_up,
+	int32_t staleness_time,
+	int32_t flush_max_buffers,
+	int32_t activity_threshold,
+	void (*cb)(void *, int),
+	void *cleaning_ctx);
+
+/* Set ACP cleaning policy with parameters on OCF cache */
+void vbdev_ocf_set_cleaning_acp(
+	int32_t wake_up,
+	int32_t flush_max_buffers,
+	void (*cb)(void *, int),
+	void *cleaning_ctx);
+
+/* Set NOP cleaning policy on OCF cache */
+void vbdev_ocf_set_cleaning_nop(
+	void (*cb)(void *, int),
+	void *cleaning_ctx);
 
 /* Set sequential cutoff parameters on OCF cache */
 void vbdev_ocf_set_seqcutoff(

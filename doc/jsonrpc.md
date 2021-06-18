@@ -2474,6 +2474,123 @@ Example response:
 }
 ~~~
 
+### bdev_ocf_set_cleaning_alru {#rpc_bdev_ocf_set_cleaning_alru}
+
+Set ALRU cleaning policy with parameters on OCF cache device.
+
+#### Parameters
+
+Name                    | Optional | Type        | Description
+----------------------- | -------- | ----------- | -----------
+name                    | Required | string      | Bdev name
+wake_up                 | Optional | int         | Period of time between awakenings of flushing thread
+staleness_time          | Optional | int         | Time that has to pass from the last write operation before a dirty cache block can be scheduled to be flushed
+flush_max_buffers       | Optional | int         | Number of dirty cache blocks to be flushed in one cleaning cycle
+activity_threshold      | Optional | int         | Cache idle time before flushing thread can start
+
+#### Example
+
+Example request:
+
+~~~
+{
+  "params": {
+    "name": "ocf0",
+    "wake_up": 20,
+    "staleness_time": 120,
+    "flush_max_buffers": 100,
+    "activity_threshold": 10000
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_cleaning_alru",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_set_cleaning_acp {#rpc_bdev_ocf_set_cleaning_acp}
+
+Set ACP cleaning policy with parameters on OCF cache device.
+
+#### Parameters
+
+Name                    | Optional | Type        | Description
+----------------------- | -------- | ----------- | -----------
+name                    | Required | string      | Bdev name
+wake_up                 | Optional | int         | Time between ACP cleaning thread iterations
+flush_max_buffers       | Optional | int         | Number of cache lines flushed in single ACP cleaning thread iteration
+
+#### Example
+
+Example request:
+
+~~~
+{
+  "params": {
+    "name": "ocf0",
+    "wake_up": 10,
+    "flush_max_buffers": 128
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_cleaning_acp",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_set_cleaning_nop {#rpc_bdev_ocf_set_cleaning_nop}
+
+Set NOP cleaning policy on OCF cache device.
+
+#### Parameters
+
+Name                    | Optional | Type        | Description
+----------------------- | -------- | ----------- | -----------
+name                    | Required | string      | Bdev name
+
+#### Example
+
+Example request:
+
+~~~
+{
+  "params": {
+    "name": "ocf0"
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_cleaning_nop",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
 ### bdev_ocf_set_seqcutoff {#rpc_bdev_ocf_set_seqcutoff}
 
 Set sequential cutoff parameters on all cores for the given OCF cache device.

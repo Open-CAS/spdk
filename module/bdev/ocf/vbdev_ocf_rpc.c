@@ -430,6 +430,233 @@ end:
 SPDK_RPC_REGISTER("bdev_ocf_set_cache_mode", rpc_bdev_ocf_set_cache_mode, SPDK_RPC_RUNTIME)
 
 static void
+cleaning_cb(void *cleaning_ctx, int error)
+{
+	struct cleaning_ctx *ctx = (struct cleaning_ctx *)cleaning_ctx;
+	struct spdk_jsonrpc_request *request = ctx->request;
+	ocf_cache_t cache = ctx->vbdev->ocf_cache;
+
+	ocf_mngt_cache_unlock(cache);
+
+	if (error) {
+		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+						     "Could not set cleaning parameters on cache %s: %d", ctx->vbdev->name, error);
+	} else {
+		spdk_jsonrpc_send_bool_response(request, true);
+	}
+
+	free(ctx);
+}
+
+/* Structure to hold the parameters for this RPC method. */
+struct rpc_bdev_ocf_set_cleaning_alru {
+	char *name;		/* main vbdev name */
+	int32_t wake_up;
+	int32_t staleness_time;
+	int32_t flush_max_buffers;
+	int32_t activity_threshold;
+};
+
+static void
+free_rpc_bdev_ocf_set_cleaning_alru(struct rpc_bdev_ocf_set_cleaning_alru *r)
+{
+	free(r->name);
+}
+
+/* Structure to decode the input parameters for this RPC method. */
+static const struct spdk_json_object_decoder rpc_bdev_ocf_set_cleaning_alru_decoders[] = {
+	{"name", offsetof(struct rpc_bdev_ocf_set_cleaning_alru, name), spdk_json_decode_string},
+	{"wake_up", offsetof(struct rpc_bdev_ocf_set_cleaning_alru, wake_up), spdk_json_decode_int32},
+	{"staleness_time", offsetof(struct rpc_bdev_ocf_set_cleaning_alru, staleness_time), spdk_json_decode_int32},
+	{"flush_max_buffers", offsetof(struct rpc_bdev_ocf_set_cleaning_alru, flush_max_buffers), spdk_json_decode_int32},
+	{"activity_threshold", offsetof(struct rpc_bdev_ocf_set_cleaning_alru, activity_threshold), spdk_json_decode_int32},
+};
+
+static void
+rpc_bdev_ocf_set_cleaning_alru(struct spdk_jsonrpc_request *request,
+			       const struct spdk_json_val *params)
+{
+	struct rpc_bdev_ocf_set_cleaning_alru req = {NULL};
+	struct vbdev_ocf *vbdev;
+	struct cleaning_ctx *ctx;
+	int rc;
+
+	rc = spdk_json_decode_object(params, rpc_bdev_ocf_set_cleaning_alru_decoders,
+				     SPDK_COUNTOF(rpc_bdev_ocf_set_cleaning_alru_decoders), &req);
+	if (rc) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto end;
+	}
+
+	vbdev = vbdev_ocf_get_by_name(req.name);
+	if (vbdev == NULL) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 spdk_strerror(ENODEV));
+		goto end;
+	}
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Not enough memory to process request");
+		goto end;
+	}
+
+	ctx->request = request;
+	ctx->vbdev = vbdev;
+
+	rc = ocf_mngt_cache_trylock(vbdev->ocf_cache);
+	if (rc) {
+		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+						     "Locking cache %s failed: %d", vbdev->name, rc);
+		free(ctx);
+		goto end;
+	}
+
+	vbdev_ocf_set_cleaning_alru(req.wake_up, req.staleness_time, req.flush_max_buffers,
+				    req.activity_threshold, cleaning_cb, ctx);
+
+end:
+	free_rpc_bdev_ocf_set_cleaning_alru(&req);
+}
+SPDK_RPC_REGISTER("bdev_ocf_set_cleaning_alru", rpc_bdev_ocf_set_cleaning_alru, SPDK_RPC_RUNTIME)
+
+/* Structure to hold the parameters for this RPC method. */
+struct rpc_bdev_ocf_set_cleaning_acp {
+	char *name;		/* main vbdev name */
+	int32_t wake_up;
+	int32_t flush_max_buffers;
+};
+
+static void
+free_rpc_bdev_ocf_set_cleaning_acp(struct rpc_bdev_ocf_set_cleaning_acp *r)
+{
+	free(r->name);
+}
+
+/* Structure to decode the input parameters for this RPC method. */
+static const struct spdk_json_object_decoder rpc_bdev_ocf_set_cleaning_acp_decoders[] = {
+	{"name", offsetof(struct rpc_bdev_ocf_set_cleaning_acp, name), spdk_json_decode_string},
+	{"wake_up", offsetof(struct rpc_bdev_ocf_set_cleaning_acp, wake_up), spdk_json_decode_int32},
+	{"flush_max_buffers", offsetof(struct rpc_bdev_ocf_set_cleaning_acp, flush_max_buffers), spdk_json_decode_int32},
+};
+
+static void
+rpc_bdev_ocf_set_cleaning_acp(struct spdk_jsonrpc_request *request,
+			      const struct spdk_json_val *params)
+{
+	struct rpc_bdev_ocf_set_cleaning_acp req = {NULL};
+	struct vbdev_ocf *vbdev;
+	struct cleaning_ctx *ctx;
+	int rc;
+
+	rc = spdk_json_decode_object(params, rpc_bdev_ocf_set_cleaning_acp_decoders,
+				     SPDK_COUNTOF(rpc_bdev_ocf_set_cleaning_acp_decoders), &req);
+	if (rc) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto end;
+	}
+
+	vbdev = vbdev_ocf_get_by_name(req.name);
+	if (vbdev == NULL) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 spdk_strerror(ENODEV));
+		goto end;
+	}
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Not enough memory to process request");
+		goto end;
+	}
+
+	ctx->request = request;
+	ctx->vbdev = vbdev;
+
+	rc = ocf_mngt_cache_trylock(vbdev->ocf_cache);
+	if (rc) {
+		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+						     "Locking cache %s failed: %d", vbdev->name, rc);
+		free(ctx);
+		goto end;
+	}
+
+	vbdev_ocf_set_cleaning_acp(req.wake_up, req.flush_max_buffers, cleaning_cb, ctx);
+
+end:
+	free_rpc_bdev_ocf_set_cleaning_acp(&req);
+}
+SPDK_RPC_REGISTER("bdev_ocf_set_cleaning_acp", rpc_bdev_ocf_set_cleaning_acp, SPDK_RPC_RUNTIME)
+
+/* Structure to hold the parameters for this RPC method. */
+struct rpc_bdev_ocf_set_cleaning_nop {
+	char *name;		/* main vbdev name */
+};
+
+static void
+free_rpc_bdev_ocf_set_cleaning_nop(struct rpc_bdev_ocf_set_cleaning_nop *r)
+{
+	free(r->name);
+}
+
+/* Structure to decode the input parameters for this RPC method. */
+static const struct spdk_json_object_decoder rpc_bdev_ocf_set_cleaning_nop_decoders[] = {
+	{"name", offsetof(struct rpc_bdev_ocf_set_cleaning_nop, name), spdk_json_decode_string},
+};
+
+static void
+rpc_bdev_ocf_set_cleaning_nop(struct spdk_jsonrpc_request *request,
+			      const struct spdk_json_val *params)
+{
+	struct rpc_bdev_ocf_set_cleaning_nop req = {NULL};
+	struct vbdev_ocf *vbdev;
+	struct cleaning_ctx *ctx;
+	int rc;
+
+	rc = spdk_json_decode_object(params, rpc_bdev_ocf_set_cleaning_nop_decoders,
+				     SPDK_COUNTOF(rpc_bdev_ocf_set_cleaning_nop_decoders), &req);
+	if (rc) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto end;
+	}
+
+	vbdev = vbdev_ocf_get_by_name(req.name);
+	if (vbdev == NULL) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 spdk_strerror(ENODEV));
+		goto end;
+	}
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Not enough memory to process request");
+		goto end;
+	}
+
+	ctx->request = request;
+	ctx->vbdev = vbdev;
+
+	rc = ocf_mngt_cache_trylock(vbdev->ocf_cache);
+	if (rc) {
+		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+						     "Locking cache %s failed: %d", vbdev->name, rc);
+		free(ctx);
+		goto end;
+	}
+
+	vbdev_ocf_set_cleaning_nop(cleaning_cb, ctx);
+
+end:
+	free_rpc_bdev_ocf_set_cleaning_nop(&req);
+}
+SPDK_RPC_REGISTER("bdev_ocf_set_cleaning_nop", rpc_bdev_ocf_set_cleaning_nop, SPDK_RPC_RUNTIME)
+
+static void
 seqcutoff_cb(int status, void *cb_arg)
 {
 	struct spdk_jsonrpc_request *request = cb_arg;

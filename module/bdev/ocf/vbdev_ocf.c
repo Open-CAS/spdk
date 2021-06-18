@@ -1520,6 +1520,99 @@ vbdev_ocf_set_cache_mode(struct vbdev_ocf *vbdev,
 	cb(rc, vbdev, cb_arg);
 }
 
+/* Set ALRU cleaning policy with parameters on OCF cache */
+void
+vbdev_ocf_set_cleaning_alru(int32_t wake_up, int32_t staleness_time, int32_t flush_max_buffers,
+			    int32_t activity_threshold, void (*cb)(void *, int), void *cleaning_ctx)
+{
+	struct cleaning_ctx *ctx;
+	ocf_cache_t cache;
+	int rc;
+
+	ctx = (struct cleaning_ctx *)cleaning_ctx;
+	cache = ctx->vbdev->ocf_cache;
+
+	if (wake_up >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+						       ocf_alru_wake_up_time, wake_up);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+	if (staleness_time >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+						       ocf_alru_stale_buffer_time, staleness_time);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+	if (flush_max_buffers >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+						       ocf_alru_flush_max_buffers, flush_max_buffers);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+	if (activity_threshold >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+						       ocf_alru_activity_threshold, activity_threshold);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+
+	ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_alru, cb, ctx);
+}
+
+/* Set ACP cleaning policy with parameters on OCF cache */
+void
+vbdev_ocf_set_cleaning_acp(int32_t wake_up, int32_t flush_max_buffers, void (*cb)(void *, int),
+			   void *cleaning_ctx)
+{
+	struct cleaning_ctx *ctx;
+	ocf_cache_t cache;
+	int rc;
+
+	ctx = (struct cleaning_ctx *)cleaning_ctx;
+	cache = ctx->vbdev->ocf_cache;
+
+	if (wake_up >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp,
+						       ocf_acp_wake_up_time, wake_up);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+	if (flush_max_buffers >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp,
+						       ocf_acp_flush_max_buffers, flush_max_buffers);
+		if (rc) {
+			cb(ctx, rc);
+			return;
+		}
+	}
+
+	ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_acp, cb, ctx);
+}
+
+/* Set NOP cleaning policy on OCF cache */
+void
+vbdev_ocf_set_cleaning_nop(void (*cb)(void *, int), void *cleaning_ctx)
+{
+	struct cleaning_ctx *ctx;
+	ocf_cache_t cache;
+
+	ctx = (struct cleaning_ctx *)cleaning_ctx;
+	cache = ctx->vbdev->ocf_cache;
+
+	ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_nop, cb, ctx);
+}
+
 /* Set sequential cutoff parameters on OCF cache */
 void
 vbdev_ocf_set_seqcutoff(struct vbdev_ocf *vbdev, const char *policy_name, int32_t threshold,

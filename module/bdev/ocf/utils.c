@@ -75,6 +75,24 @@ ocf_get_cache_line_size(ocf_cache_t cache)
 	return ocf_cache_get_line_size(cache) / KiB;
 }
 
+static char *seqcutoff_policies[ocf_seq_cutoff_policy_max] = {
+	[ocf_seq_cutoff_policy_always] = "always",
+	[ocf_seq_cutoff_policy_full] = "full",
+	[ocf_seq_cutoff_policy_never] = "never",
+};
+
+ocf_seq_cutoff_policy
+ocf_get_seqcutoff_policy(const char *policy_name)
+{
+	int i;
+
+	for (i = 0; i < ocf_seq_cutoff_policy_max; i++)
+		if (!strcmp(policy_name, seqcutoff_policies[i]))
+			return i;
+
+	return ocf_seq_cutoff_policy_default;
+}
+
 int
 vbdev_ocf_mngt_start(struct vbdev_ocf *vbdev, vbdev_ocf_mngt_fn *path,
 		     vbdev_ocf_mngt_callback cb, void *cb_arg)

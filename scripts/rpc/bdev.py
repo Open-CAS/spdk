@@ -229,6 +229,25 @@ def bdev_ocf_set_cache_mode(client, name, mode):
     return client.call('bdev_ocf_set_cache_mode', params)
 
 
+def bdev_ocf_set_seqcutoff(client, name, policy, threshold, promotion_count):
+    """Set sequential cutoff parameters on all cores for the given OCF cache device
+
+    Args:
+        name: Name of OCF cache bdev
+        policy: Sequential cutoff policy
+        threshold: Activation threshold [KiB]
+        promotion_count: Stream promotion request count threshold
+    """
+    params = {
+        'name': name,
+        'policy': policy,
+        'threshold': threshold,
+        'promotion_count': promotion_count,
+    }
+
+    return client.call('bdev_ocf_set_seqcutoff', params)
+
+
 @deprecated_alias('construct_malloc_bdev')
 def bdev_malloc_create(client, num_blocks, block_size, name=None, uuid=None):
     """Construct a malloc block device.

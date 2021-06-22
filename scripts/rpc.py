@@ -341,6 +341,22 @@ if __name__ == "__main__":
     p.add_argument('mode', help='OCF cache mode', choices=['wb', 'wt', 'pt', 'wa', 'wi', 'wo'])
     p.set_defaults(func=bdev_ocf_set_cache_mode)
 
+    def bdev_ocf_start_flush(args):
+        print_json(rpc.bdev.bdev_ocf_start_flush(args.client,
+                                                 name=args.name))
+    p = subparsers.add_parser('bdev_ocf_start_flush',
+                              help='Start flushing OCF block device')
+    p.add_argument('name', help='Name of OCF bdev')
+    p.set_defaults(func=bdev_ocf_start_flush)
+
+    def bdev_ocf_get_flush_status(args):
+        print_json(rpc.bdev.bdev_ocf_get_flush_status(args.client,
+                                                    name=args.name))
+    p = subparsers.add_parser('bdev_ocf_get_flush_status',
+                              help='Get flush status of OCF block device')
+    p.add_argument('name', help='Name of OCF bdev')
+    p.set_defaults(func=bdev_ocf_get_flush_status)
+
     def bdev_malloc_create(args):
         num_blocks = (args.total_size * 1024 * 1024) // args.block_size
         print_json(rpc.bdev.bdev_malloc_create(args.client,

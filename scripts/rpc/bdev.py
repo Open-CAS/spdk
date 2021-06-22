@@ -229,6 +229,35 @@ def bdev_ocf_set_cache_mode(client, name, mode):
     return client.call('bdev_ocf_set_cache_mode', params)
 
 
+def bdev_ocf_start_flush(client, name):
+    """Start flushing OCF block device
+
+    Args:
+        name: name of OCF bdev
+    """
+    params = {
+        'name': name,
+    }
+
+    return client.call('bdev_ocf_start_flush', params)
+
+
+def bdev_ocf_get_flush_status(client, name):
+    """Get flush status of OCF block device
+
+    Args:
+        name: name of OCF bdev
+
+    Returns:
+        Flush status
+    """
+    params = {
+        'name': name,
+    }
+
+    return client.call('bdev_ocf_get_flush_status', params)
+
+
 @deprecated_alias('construct_malloc_bdev')
 def bdev_malloc_create(client, num_blocks, block_size, name=None, uuid=None):
     """Construct a malloc block device.

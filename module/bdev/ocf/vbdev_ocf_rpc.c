@@ -442,3 +442,152 @@ end:
 	free_rpc_bdev_ocf_set_cache_mode(&req);
 }
 SPDK_RPC_REGISTER("bdev_ocf_set_cache_mode", rpc_bdev_ocf_set_cache_mode, SPDK_RPC_RUNTIME)
+
+/* Structure to hold the parameters for this RPC method. */
+struct rpc_bdev_ocf_start_flush {
+	char *name;			/* main vbdev name */
+};
+
+static void
+free_rpc_bdev_ocf_start_flush(struct rpc_bdev_ocf_start_flush *r)
+{
+	free(r->name);
+}
+
+/* Structure to decode the input parameters for this RPC method. */
+static const struct spdk_json_object_decoder rpc_bdev_ocf_start_flush_decoders[] = {
+	{"name", offsetof(struct rpc_bdev_ocf_set_cache_mode, name), spdk_json_decode_string},
+};
+
+struct get_ocf_start_flush_ctx {
+	struct spdk_jsonrpc_request *request;
+	struct vbdev_ocf *vbdev;
+};
+
+static void
+rpc_bdev_ocf_start_flush_cmpl(ocf_cache_t cache, void *priv, int error)
+{
+	struct get_ocf_start_flush_ctx *ctx = (struct get_ocf_stats_ctx *) priv;
+
+	ctx->vbdev->flush.in_progress = false;
+	ctx->vbdev->flush.status = error;
+
+	ocf_mngt_cache_read_unlock(cache);
+
+	free(ctx);
+}
+
+static void
+rpc_bdev_ocf_start_flush_lock_cmpl(ocf_cache_t cache, void *priv, int error)
+{
+	struct get_ocf_start_flush_ctx *ctx = (struct get_ocf_stats_ctx *) priv;
+
+	if (error) {
+		spdk_jsonrpc_send_error_response_fmt(ctx->request,
+						     SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
+						     "Could not lock cache: %d", error);
+		free(ctx);
+		return;
+	}
+
+	ctx->vbdev->flush.in_progress = true;
+	ocf_mngt_cache_flush(cache, rpc_bdev_ocf_start_flush_cmpl, ctx);
+
+	spdk_jsonrpc_send_bool_response(ctx->request, true);
+}
+
+static void
+rpc_bdev_ocf_start_flush(struct spdk_jsonrpc_request *request,
+			    const struct spdk_json_val *params)
+{
+	struct rpc_bdev_ocf_start_flush req = {NULL};
+	struct get_ocf_start_flush_ctx *ctx;
+	int status;
+
+	ctx = calloc(1, sizeof(*ctx));
+	if (!ctx) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Not enough memory to process request");
+		goto end;
+	}
+
+	status = spdk_json_decode_object(params, rpc_bdev_ocf_start_flush_decoders,
+					 SPDK_COUNTOF(rpc_bdev_ocf_start_flush_decoders),
+					 &req);
+	if (status) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		free(ctx);
+		goto end;
+	}
+
+	ctx->vbdev = vbdev_ocf_get_by_name(req.name);
+	if (ctx->vbdev == NULL) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 spdk_strerror(ENODEV));
+		free(ctx);
+		goto end;
+	}
+
+	ctx->request = request;
+	ocf_mngt_cache_read_lock(ctx->vbdev->ocf_cache, rpc_bdev_ocf_start_flush_lock_cmpl, ctx);
+
+end:
+	free_rpc_bdev_ocf_start_flush(&req);
+}
+SPDK_RPC_REGISTER("bdev_ocf_start_flush", rpc_bdev_ocf_start_flush, SPDK_RPC_RUNTIME)
+
+/* Structure to hold the parameters for this RPC method. */
+struct rpc_bdev_ocf_get_flush_status {
+	char *name;			/* main vbdev name */
+};
+
+static void
+free_rpc_bdev_ocf_get_flush_status(struct rpc_bdev_ocf_get_flush_status *r)
+{
+	free(r->name);
+}
+
+/* Structure to decode the input parameters for this RPC method. */
+static const struct spdk_json_object_decoder rpc_bdev_ocf_get_flush_status_decoders[] = {
+	{"name", offsetof(struct rpc_bdev_ocf_set_cache_mode, name), spdk_json_decode_string},
+};
+
+static void
+rpc_bdev_ocf_get_flush_status(struct spdk_jsonrpc_request *request,
+			    const struct spdk_json_val *params)
+{
+	struct rpc_bdev_ocf_get_flush_status req = {NULL};
+	struct spdk_json_write_ctx *w;
+	struct vbdev_ocf *vbdev;
+	int status;
+
+	status = spdk_json_decode_object(params, rpc_bdev_ocf_start_flush_decoders,
+					 SPDK_COUNTOF(rpc_bdev_ocf_get_flush_status_decoders),
+					 &req);
+	if (status) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto end;
+	}
+
+	vbdev = vbdev_ocf_get_by_name(req.name);
+	if (vbdev == NULL) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 spdk_strerror(ENODEV));
+		goto end;
+	}
+
+	w = spdk_jsonrpc_begin_result(request);
+
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_bool(w, "in_progress", vbdev->flush.in_progress);
+	if (!vbdev->flush.in_progress)
+		spdk_json_write_named_int32(w, "status", vbdev->flush.status);
+	spdk_json_write_object_end(w);
+
+	spdk_jsonrpc_end_result(request, w);
+end:
+	free_rpc_bdev_ocf_start_flush(&req);
+}
+SPDK_RPC_REGISTER("bdev_ocf_get_flush_status", rpc_bdev_ocf_get_flush_status, SPDK_RPC_RUNTIME)

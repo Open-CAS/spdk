@@ -53,17 +53,25 @@ struct ocf_persistent_meta_zone {
 
 #define MAX_PERSISTENT_ZONES 2
 
+struct vbdev_ocf_mngt_queue_ctx {
+	struct vbdev_ocf             *vbdev;
+	ocf_queue_t                  mngt_queue;
+	struct spdk_thread           *mngt_thread;
+	struct spdk_poller           *mngt_poller;
+};
+
 /* Context of cache instance */
 struct vbdev_ocf_cache_ctx {
 	struct vbdev_ocf             *vbdev;
-	ocf_queue_t                  mngt_queue;
 	ocf_queue_t                  cleaner_queue;
 	pthread_mutex_t              lock;
 	env_atomic                   refcnt;
+	struct vbdev_ocf_mngt_queue_ctx    *mngt_ctx;
 
 	/* Channels for cleaner */
 	struct spdk_io_channel      *cleaner_cache_channel;
 	struct spdk_io_channel      *cleaner_core_channel;
+
 	bool                         create;
 	bool                         force;
 	char cache_name[OCF_CACHE_NAME_SIZE];

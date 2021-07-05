@@ -1642,6 +1642,128 @@ vbdev_ocf_set_cache_mode(struct vbdev_ocf *vbdev,
 	cb(rc, vbdev, cb_arg);
 }
 
+/* Set ALRU cleaning policy with parameters on OCF cache */
+void
+vbdev_ocf_set_cleaning_alru(
+		struct vbdev_ocf *vbdev,
+		int32_t wake_up,
+		int32_t staleness_time,
+		int32_t flush_max_buffers,
+		int32_t activity_threshold,
+		void (*cb)(int, void *),
+		void *cb_arg)
+{
+	ocf_cache_t cache;
+	int rc;
+
+	cache = vbdev->ocf_cache;
+
+	rc = ocf_mngt_cache_trylock(cache);
+	if (rc) {
+		cb(rc, cb_arg);
+		return;
+	}
+
+	rc = ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_alru);
+	if (rc)
+		goto end;
+
+	if (wake_up >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+				ocf_alru_wake_up_time, wake_up);
+		if (rc)
+			goto end;
+	}
+	if (staleness_time >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+				ocf_alru_stale_buffer_time, staleness_time);
+		if (rc)
+			goto end;
+	}
+	if (flush_max_buffers >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+				ocf_alru_flush_max_buffers, flush_max_buffers);
+		if (rc)
+			goto end;
+	}
+	if (activity_threshold >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+				ocf_alru_activity_threshold, activity_threshold);
+		if (rc)
+			goto end;
+	}
+
+end:
+	ocf_mngt_cache_unlock(cache);
+	cb(rc, cb_arg);
+}
+
+/* Set ACP cleaning policy with parameters on OCF cache */
+void
+vbdev_ocf_set_cleaning_acp(
+		struct vbdev_ocf *vbdev,
+		int32_t wake_up,
+		int32_t flush_max_buffers,
+		void (*cb)(int, void *),
+		void *cb_arg)
+{
+	ocf_cache_t cache;
+	int rc;
+
+	cache = vbdev->ocf_cache;
+
+	rc = ocf_mngt_cache_trylock(cache);
+	if (rc) {
+		cb(rc, cb_arg);
+		return;
+	}
+
+	rc = ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_acp);
+	if (rc)
+		goto end;
+
+	if (wake_up >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp,
+				ocf_acp_wake_up_time, wake_up);
+		if (rc)
+			goto end;
+	}
+	if (flush_max_buffers >= 0) {
+		rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp,
+				ocf_acp_flush_max_buffers, flush_max_buffers);
+		if (rc)
+			goto end;
+	}
+
+end:
+	ocf_mngt_cache_unlock(cache);
+	cb(rc, cb_arg);
+}
+
+/* Set NOP cleaning policy on OCF cache */
+void
+vbdev_ocf_set_cleaning_nop(
+		struct vbdev_ocf *vbdev,
+		void (*cb)(int, void *),
+		void *cb_arg)
+{
+	ocf_cache_t cache;
+	int rc;
+
+	cache = vbdev->ocf_cache;
+
+	rc = ocf_mngt_cache_trylock(cache);
+	if (rc) {
+		cb(rc, cb_arg);
+		return;
+	}
+
+	rc = ocf_mngt_cache_cleaning_set_policy(cache, ocf_cleaning_nop);
+
+	ocf_mngt_cache_unlock(cache);
+	cb(rc, cb_arg);
+}
+
 /* This called if new device is created in SPDK application
  * If that device named as one of base bdevs of OCF vbdev,
  * claim and open them */

@@ -215,6 +215,30 @@ void vbdev_ocf_set_cache_mode(
 	void (*cb)(int, struct vbdev_ocf *, void *),
 	void *cb_arg);
 
+/* Set ALRU cleaning policy with parameters on OCF cache */
+void vbdev_ocf_set_cleaning_alru(
+	struct vbdev_ocf *vbdev,
+	int32_t wake_up,
+	int32_t staleness_time,
+	int32_t flush_max_buffers,
+	int32_t activity_threshold,
+	void (*cb)(int, void *),
+	void *cb_arg);
+
+/* Set ACP cleaning policy with parameters on OCF cache */
+void vbdev_ocf_set_cleaning_acp(
+	struct vbdev_ocf *vbdev,
+	int32_t wake_up,
+	int32_t flush_max_buffers,
+	void (*cb)(int, void *),
+	void *cb_arg);
+
+/* Set NOP cleaning policy on OCF cache */
+void vbdev_ocf_set_cleaning_nop(
+	struct vbdev_ocf *vbdev,
+	void (*cb)(int, void *),
+	void *cb_arg);
+
 typedef void (*vbdev_ocf_foreach_fn)(struct vbdev_ocf *, void *);
 
 /* Execute fn for each OCF device that is online or waits for base devices */

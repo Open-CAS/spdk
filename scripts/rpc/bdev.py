@@ -229,6 +229,60 @@ def bdev_ocf_set_cache_mode(client, name, mode):
     return client.call('bdev_ocf_set_cache_mode', params)
 
 
+def bdev_ocf_set_cleaning_alru(client, name, wake_up, staleness_time,
+                               flush_max_buffers, activity_threshold):
+    """Set ALRU cleaning policy with parameters on OCF cache device
+
+    Args:
+        name: name of OCF bdev
+        wake_up: Period of time between awakenings of flushing thread <0-3600>[s]
+        staleness_time: Time that has to pass from the last write operation before a
+                        dirty cache block can be scheduled to be flushed <1-3600>[s]
+        flush_max_buffers: Number of dirty cache blocks to be flushed
+                           in one cleaning cycle <1-10000>
+        activity_threshold: Cache idle time before flushing
+                            thread can start <0-1000000>[ms]
+    """
+    params = {
+        'name': name,
+        'wake_up': wake_up,
+        'staleness_time': staleness_time,
+        'flush_max_buffers': flush_max_buffers,
+        'activity_threshold': activity_threshold,
+    }
+
+    return client.call('bdev_ocf_set_cleaning_alru', params)
+
+
+def bdev_ocf_set_cleaning_acp(client, name, wake_up, flush_max_buffers):
+    """Set ACP cleaning policy with parameters on OCF cache device
+
+    Args:
+        name: name of OCF bdev
+        wake_up: Time between ACP cleaning thread iterations <0-10000>[ms]
+        flush_max_buffers: Number of cache lines flushed in single
+                           ACP cleaning thread iteration <1-10000>
+    """
+    params = {
+        'name': name,
+        'wake_up': wake_up,
+        'flush_max_buffers': flush_max_buffers,
+    }
+
+    return client.call('bdev_ocf_set_cleaning_acp', params)
+
+
+def bdev_ocf_set_cleaning_nop(client, name):
+    """Set NOP cleaning policy on OCF cache device
+
+    Args:
+        name: name of OCF bdev
+    """
+    params = {'name': name}
+
+    return client.call('bdev_ocf_set_cleaning_nop', params)
+
+
 @deprecated_alias('construct_malloc_bdev')
 def bdev_malloc_create(client, num_blocks, block_size, name=None, uuid=None):
     """Construct a malloc block device.

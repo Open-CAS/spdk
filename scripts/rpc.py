@@ -341,6 +341,49 @@ if __name__ == "__main__":
     p.add_argument('mode', help='OCF cache mode', choices=['wb', 'wt', 'pt', 'wa', 'wi', 'wo'])
     p.set_defaults(func=bdev_ocf_set_cache_mode)
 
+    def bdev_ocf_set_cleaning_alru(args):
+        print_json(rpc.bdev.bdev_ocf_set_cleaning_alru(args.client,
+                                                       name=args.name,
+                                                       wake_up=args.wake_up,
+                                                       staleness_time=args.staleness_time,
+                                                       flush_max_buffers=args.flush_max_buffers,
+                                                       activity_threshold=args.activity_threshold))
+    p = subparsers.add_parser('bdev_ocf_set_cleaning_alru',
+                              help='Set ALRU cleaning policy with parameters on OCF cache device')
+    p.add_argument('name', help='Name of OCF bdev')
+    p.add_argument('-w', '--wake-up', type=int, default=-1,
+                   help='Period of time between awakenings of flushing thread <0-3600>[s] (default: 20 s)')
+    p.add_argument('-s', '--staleness-time', type=int, default=-1,
+                   help='Time that has to pass from the last write operation before a dirty cache block '
+                        'can be scheduled to be flushed <1-3600>[s] (default: 120 s)')
+    p.add_argument('-b', '--flush-max-buffers', type=int, default=-1,
+                   help='Number of dirty cache blocks to be flushed in one cleaning cycle <1-10000> (default: 100)')
+    p.add_argument('-t', '--activity-threshold', type=int, default=-1,
+                   help='Cache idle time before flushing thread can start <0-1000000>[ms] (default: 10000 ms)')
+    p.set_defaults(func=bdev_ocf_set_cleaning_alru)
+
+    def bdev_ocf_set_cleaning_acp(args):
+        print_json(rpc.bdev.bdev_ocf_set_cleaning_acp(args.client,
+                                                      name=args.name,
+                                                      wake_up=args.wake_up,
+                                                      flush_max_buffers=args.flush_max_buffers))
+    p = subparsers.add_parser('bdev_ocf_set_cleaning_acp',
+                              help='Set ACP cleaning policy with parameters on OCF cache device')
+    p.add_argument('name', help='Name of OCF bdev')
+    p.add_argument('-w', '--wake-up', type=int, default=-1,
+                   help='Time between ACP cleaning thread iterations <0-10000>[ms] (default: 10 ms)')
+    p.add_argument('-b', '--flush-max-buffers', type=int, default=-1,
+                   help='Number of cache lines flushed in single ACP cleaning thread iteration <1-10000> (default: 128)')
+    p.set_defaults(func=bdev_ocf_set_cleaning_acp)
+
+    def bdev_ocf_set_cleaning_nop(args):
+        print_json(rpc.bdev.bdev_ocf_set_cleaning_nop(args.client,
+                                                      name=args.name))
+    p = subparsers.add_parser('bdev_ocf_set_cleaning_nop',
+                              help='Set NOP cleaning policy on OCF cache device')
+    p.add_argument('name', help='Name of OCF bdev')
+    p.set_defaults(func=bdev_ocf_set_cleaning_nop)
+
     def bdev_malloc_create(args):
         num_blocks = (args.total_size * 1024 * 1024) // args.block_size
         print_json(rpc.bdev.bdev_malloc_create(args.client,

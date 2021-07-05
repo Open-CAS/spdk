@@ -43,6 +43,12 @@ const char *ocf_get_cache_modename(ocf_cache_mode_t mode);
 /* Get cache line size in KiB units */
 int ocf_get_cache_line_size(ocf_cache_t cache);
 
+/* Get cleaning policy name */
+const char *ocf_get_cleaning_policy_name(ocf_cleaning_t policy);
+
+/* Get sequential cutoff policy name */
+const char *ocf_get_seqcutoff_policy_name(ocf_seq_cutoff_policy policy);
+
 /* Initiate management operation
  * Receives NULL terminated array of functions (path)
  * and callback (cb)

@@ -45,6 +45,18 @@ static char *cache_modes[ocf_cache_mode_max] = {
 	[ocf_cache_mode_wo] = "wo",
 };
 
+static char *cleaning_policies[ocf_cleaning_max] = {
+	[ocf_cleaning_nop] = "nop",
+	[ocf_cleaning_alru] = "alru",
+	[ocf_cleaning_acp] = "acp",
+};
+
+static char *seqcutoff_policies[ocf_seq_cutoff_policy_max] = {
+	[ocf_seq_cutoff_policy_always] = "always",
+	[ocf_seq_cutoff_policy_full] = "full",
+	[ocf_seq_cutoff_policy_never] = "never",
+};
+
 ocf_cache_mode_t
 ocf_get_cache_mode(const char *cache_mode)
 {
@@ -73,6 +85,24 @@ int
 ocf_get_cache_line_size(ocf_cache_t cache)
 {
 	return ocf_cache_get_line_size(cache) / KiB;
+}
+
+const char *
+ocf_get_cleaning_policy_name(ocf_cleaning_t policy)
+{
+	if (policy < ocf_cleaning_max)
+		return cleaning_policies[policy];
+	else
+		return NULL;
+}
+
+const char *
+ocf_get_seqcutoff_policy_name(ocf_seq_cutoff_policy policy)
+{
+	if (policy < ocf_seq_cutoff_policy_max)
+		return seqcutoff_policies[policy];
+	else
+		return NULL;
 }
 
 int

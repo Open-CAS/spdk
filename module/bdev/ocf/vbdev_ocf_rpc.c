@@ -305,10 +305,100 @@ struct bdev_get_bdevs_ctx {
 };
 
 static void
+ocf_json_write_cleaning_params(struct spdk_json_write_ctx *w, ocf_cache_t cache) {
+	ocf_cleaning_t cleaning_policy;
+	uint32_t cleaning_wake_up, cleaning_staleness_time,
+			 cleaning_flush_max_buffers, cleaning_activity_threshold;
+	int rc;
+
+	rc = ocf_mngt_cache_cleaning_get_policy(cache, &cleaning_policy);
+	if (rc)
+		SPDK_ERRLOG("Could not get OCF cleaning policy: %d\n", rc);
+	else {
+		spdk_json_write_named_string(w, "policy", ocf_get_cleaning_policy_name(cleaning_policy));
+	}
+
+	if (cleaning_policy == ocf_cleaning_alru) {
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+				ocf_alru_wake_up_time, &cleaning_wake_up);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning wake up time: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "wake_up", cleaning_wake_up);
+
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+				ocf_alru_stale_buffer_time, &cleaning_staleness_time);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning staleness time: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "staleness_time", cleaning_staleness_time);
+
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+				ocf_alru_flush_max_buffers, &cleaning_flush_max_buffers);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning flush max buffers: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "flush_max_buffers", cleaning_flush_max_buffers);
+
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+				ocf_alru_activity_threshold, &cleaning_activity_threshold);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning activity threshold: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "activity_threshold", cleaning_activity_threshold);
+
+	} else if (cleaning_policy == ocf_cleaning_acp) {
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
+				ocf_acp_wake_up_time, &cleaning_wake_up);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning wake up time: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "wake_up", cleaning_wake_up);
+
+		rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
+				ocf_acp_flush_max_buffers, &cleaning_flush_max_buffers);
+		if (rc)
+			SPDK_ERRLOG("Could not get OCF cleaning flush max buffers: %d\n", rc);
+		else
+			spdk_json_write_named_uint32(w, "flush_max_buffers", cleaning_flush_max_buffers);
+
+	}
+}
+
+static void
+ocf_json_write_seqcutoff_params(struct spdk_json_write_ctx *w, ocf_core_t core) {
+	ocf_seq_cutoff_policy seqcutoff_policy;
+	uint32_t seqcutoff_threshold, seqcutoff_promotion_count;
+	int rc;
+
+	rc = ocf_mngt_core_get_seq_cutoff_policy(core, &seqcutoff_policy);
+	if (rc)
+		SPDK_ERRLOG("Could not get OCF sequential cutoff policy: %d\n", rc);
+	else
+		spdk_json_write_named_string(w, "policy", ocf_get_seqcutoff_policy_name(seqcutoff_policy));
+
+	rc = ocf_mngt_core_get_seq_cutoff_threshold(core, &seqcutoff_threshold);
+	if (rc)
+		SPDK_ERRLOG("Could not get OCF sequential cutoff threshold: %d\n", rc);
+	else
+		spdk_json_write_named_uint32(w, "threshold", seqcutoff_threshold);
+
+	rc = ocf_mngt_core_get_seq_cutoff_promotion_count(core, &seqcutoff_promotion_count);
+	if (rc)
+		SPDK_ERRLOG("Could not get OCF sequential cutoff promotion count: %d\n", rc);
+	else
+		spdk_json_write_named_uint32(w, "promotion_count", seqcutoff_promotion_count);
+}
+
+static void
 bdev_get_bdevs_fn(struct vbdev_ocf *vbdev, void *ctx)
 {
 	struct bdev_get_bdevs_ctx *cctx = ctx;
 	struct spdk_json_write_ctx *w = cctx->w;
+	const char *cache_mode_name;
+	uint32_t cache_line_size;
+	ocf_cache_t cache;
+	ocf_core_t core;
 
 	if (cctx->name != NULL &&
 	    strcmp(vbdev->name, cctx->name) &&
@@ -317,6 +407,11 @@ bdev_get_bdevs_fn(struct vbdev_ocf *vbdev, void *ctx)
 		return;
 	}
 
+	cache = vbdev->ocf_cache;
+	core = vbdev->ocf_core;
+	cache_mode_name = ocf_get_cache_modename(ocf_cache_get_mode(cache));
+	cache_line_size = ocf_get_cache_line_size(cache);
+
 	spdk_json_write_object_begin(w);
 	spdk_json_write_named_string(w, "name", vbdev->name);
 	spdk_json_write_named_bool(w, "started", vbdev->state.started);
@@ -324,11 +419,23 @@ bdev_get_bdevs_fn(struct vbdev_ocf *vbdev, void *ctx)
 	spdk_json_write_named_object_begin(w, "cache");
 	spdk_json_write_named_string(w, "name", vbdev->cache.name);
 	spdk_json_write_named_bool(w, "attached", vbdev->cache.attached);
+	spdk_json_write_named_string(w, "cache_mode", cache_mode_name);
+	spdk_json_write_named_uint32(w, "cache_line_size", cache_line_size);
+
+	spdk_json_write_named_object_begin(w, "cleaning");
+	ocf_json_write_cleaning_params(w, cache);
+	spdk_json_write_object_end(w);
+
 	spdk_json_write_object_end(w);
 
 	spdk_json_write_named_object_begin(w, "core");
 	spdk_json_write_named_string(w, "name", vbdev->core.name);
 	spdk_json_write_named_bool(w, "attached", vbdev->core.attached);
+
+	spdk_json_write_named_object_begin(w, "sequential_cutoff");
+	ocf_json_write_seqcutoff_params(w, core);
+	spdk_json_write_object_end(w);
+
 	spdk_json_write_object_end(w);
 
 	spdk_json_write_object_end(w);

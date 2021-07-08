@@ -44,7 +44,7 @@ include $(SPDK_ROOT_DIR)/mk/spdk.common.mk
 
 LIBNAME := ocfenv
 
-CFLAGS +=  $(ENV_CFLAGS) -I$(CURDIR) -I$(CURDIR)/include -w
+CFLAGS +=  $(ENV_CFLAGS) -I$(CURDIR) -I$(CURDIR)/include -w -DOCF_CONFIG_MEM_SAVER=1 -DOCF_CONFIG_MAX_CORES=64
 C_SRCS = $(shell find -name \*.c)
 
 LIB = $(call spdk_lib_list_to_static_libs,$(LIBNAME))

@@ -2099,18 +2099,20 @@ Example response:
 ### bdev_ocf_create {#rpc_bdev_ocf_create}
 
 Construct new OCF bdev.
-Command accepts cache mode that is going to be used.
-You can find more details about supported cache modes in the [OCF documentation](https://open-cas.github.io/cache_configuration.html#cache-mode)
+By default, loads existing cache configuration from cache metadata (use --create flag to start a new cache instance).
+You can find more details about supported configuration options in the [OCF documentation](https://open-cas.github.io/cache_configuration.html)
 
 #### Parameters
 
 Name                    | Optional | Type        | Description
 ----------------------- | -------- | ----------- | -----------
 name                    | Required | string      | Bdev name to use
-mode                    | Required | string      | OCF cache mode: wb, wt, pt, wa, wi, wo
-cache_line_size         | Optional | int         | OCF cache line size in KiB: 4, 8, 16, 32, 64
 cache_bdev_name         | Required | string      | Name of underlying cache bdev
 core_bdev_name          | Required | string      | Name of underlying core bdev
+cache_mode              | Optional | string      | OCF cache mode: wb, wt, pt, wa, wi, wo
+cache_line_size         | Optional | int         | OCF cache line size in KiB: 4, 8, 16, 32, 64
+create                  | Optional | bool        | Creates a new cache instance if no metadata exists
+force                   | Optional | bool        | Force creating a new cache instance, even if metadata already exists
 
 #### Result
 
@@ -2124,10 +2126,12 @@ Example request:
 {
   "params": {
     "name": "ocf0",
-    "mode": "wt",
-    "cache_line_size": 64,
     "cache_bdev_name": "Nvme0n1",
-    "core_bdev_name": "aio0"
+    "core_bdev_name": "aio0",
+    "cache_mode": "wb",
+    "cache_line_size": 64,
+    "create": true,
+    "force": true
   },
   "jsonrpc": "2.0",
   "method": "bdev_ocf_create",

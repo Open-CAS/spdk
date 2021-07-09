@@ -24,7 +24,7 @@ waitforlisten $spdk_pid
 $rpc_py bdev_malloc_create 101 512 -b Malloc0
 $rpc_py bdev_malloc_create 101 512 -b Malloc1
 
-$rpc_py bdev_ocf_create PartCache wt Malloc0 NonExisting
+$rpc_py bdev_ocf_create PartCache Malloc0 NonExisting --create --force
 
 $rpc_py bdev_ocf_get_bdevs PartCache | jq -e \
 	'.[0] | .started == false and .cache.attached and .core.attached == false'
@@ -43,7 +43,7 @@ if bdev_check_claimed Malloc0; then
 	exit 1
 fi
 
-$rpc_py bdev_ocf_create FullCache wt Malloc0 Malloc1
+$rpc_py bdev_ocf_create FullCache Malloc0 Malloc1 --create --force
 
 $rpc_py bdev_ocf_get_bdevs FullCache | jq -e \
 	'.[0] | .started and .cache.attached and .core.attached'
@@ -59,7 +59,7 @@ if bdev_check_claimed Malloc0 && bdev_check_claimed Malloc1; then
 	exit 1
 fi
 
-$rpc_py bdev_ocf_create HotCache wt Malloc0 Malloc1
+$rpc_py bdev_ocf_create HotCache Malloc0 Malloc1 --create --force
 
 if ! (bdev_check_claimed Malloc0 && bdev_check_claimed Malloc1); then
 	echo >&2 "Base devices expected to be claimed now"
@@ -81,7 +81,7 @@ if [[ $gone == false ]]; then
 fi
 
 # check if shutdown of running CAS bdev is ok
-$rpc_py bdev_ocf_create PartCache wt NonExisting Malloc1
+$rpc_py bdev_ocf_create PartCache NonExisting Malloc1 --create --force
 
 trap - SIGINT SIGTERM EXIT
 

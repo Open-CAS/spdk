@@ -41,28 +41,32 @@
 /* Structure to hold the parameters for this RPC method. */
 struct rpc_bdev_ocf_create {
 	char *name;			/* main vbdev */
-	char *mode;			/* OCF mode (choose one) */
-	uint64_t cache_line_size;	/* OCF cache line size */
 	char *cache_bdev_name;		/* sub bdev */
 	char *core_bdev_name;		/* sub bdev */
+	char *cache_mode;			/* OCF cache mode */
+	uint64_t cache_line_size;	/* OCF cache line size */
+	bool create;			/* Create new cache instance */
+	bool force;			/* Force creating new cache instance */
 };
 
 static void
 free_rpc_bdev_ocf_create(struct rpc_bdev_ocf_create *r)
 {
 	free(r->name);
-	free(r->core_bdev_name);
 	free(r->cache_bdev_name);
-	free(r->mode);
+	free(r->core_bdev_name);
+	free(r->cache_mode);
 }
 
 /* Structure to decode the input parameters for this RPC method. */
 static const struct spdk_json_object_decoder rpc_bdev_ocf_create_decoders[] = {
 	{"name", offsetof(struct rpc_bdev_ocf_create, name), spdk_json_decode_string},
-	{"mode", offsetof(struct rpc_bdev_ocf_create, mode), spdk_json_decode_string},
-	{"cache_line_size", offsetof(struct rpc_bdev_ocf_create, cache_line_size), spdk_json_decode_uint64, true},
 	{"cache_bdev_name", offsetof(struct rpc_bdev_ocf_create, cache_bdev_name), spdk_json_decode_string},
 	{"core_bdev_name", offsetof(struct rpc_bdev_ocf_create, core_bdev_name), spdk_json_decode_string},
+	{"cache_mode", offsetof(struct rpc_bdev_ocf_create, cache_mode), spdk_json_decode_string},
+	{"cache_line_size", offsetof(struct rpc_bdev_ocf_create, cache_line_size), spdk_json_decode_uint64, true},
+	{"create", offsetof(struct rpc_bdev_ocf_create, create), spdk_json_decode_bool, true},
+	{"force", offsetof(struct rpc_bdev_ocf_create, force), spdk_json_decode_bool, true},
 };
 
 static void
@@ -99,8 +103,15 @@ rpc_bdev_ocf_create(struct spdk_jsonrpc_request *request,
 		return;
 	}
 
-	vbdev_ocf_construct(req.name, req.mode, req.cache_line_size, req.cache_bdev_name,
-			    req.core_bdev_name, false, construct_cb, request);
+	if (req.force && !req.create) {
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameter - can't use --force flag without --create flag");
+		free_rpc_bdev_ocf_create(&req);
+		return;
+	}
+
+	vbdev_ocf_construct(req.name, req.cache_bdev_name, req.core_bdev_name, req.cache_mode,
+			    req.cache_line_size, req.create, req.force, construct_cb, request);
 	free_rpc_bdev_ocf_create(&req);
 }
 SPDK_RPC_REGISTER("bdev_ocf_create", rpc_bdev_ocf_create, SPDK_RPC_RUNTIME)

@@ -37,10 +37,12 @@ bdevperf_config() {
 			  "method": "bdev_ocf_create",
 			  "params": {
 				"name": "MalCache0",
-				"mode": "wb",
+				"cache_mode": "wb",
 				"cache_line_size": 4,
 				"cache_bdev_name": "Malloc0",
-				"core_bdev_name": "Malloc1"
+				"core_bdev_name": "Malloc1",
+				"create": true,
+				"force": true
 			  }
 			}
 		JSON

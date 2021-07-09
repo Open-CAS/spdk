@@ -17,7 +17,7 @@ waitforlisten $spdk_pid
 for cache_line_size in "${cache_line_sizes[@]}"; do
 	$rpc_py bdev_malloc_create 101 512 -b Malloc0
 	$rpc_py bdev_malloc_create 101 512 -b Malloc1
-	$rpc_py bdev_ocf_create Cache0 wt Malloc0 Malloc1 --cache-line-size $cache_line_size
+	$rpc_py bdev_ocf_create Cache0 Malloc0 Malloc1 --cache-line-size $cache_line_size --create --force
 
 	$rpc_py bdev_ocf_get_bdevs | jq -e \
 		'.[0] | .started and .cache.attached and .core.attached'
@@ -36,7 +36,7 @@ done
 # Prepare OCF cache for dynamic configuration switching
 $rpc_py bdev_malloc_create 101 512 -b Malloc0
 $rpc_py bdev_malloc_create 101 512 -b Malloc1
-$rpc_py bdev_ocf_create Cache0 wt Malloc0 Malloc1
+$rpc_py bdev_ocf_create Cache0 Malloc0 Malloc1 --create --force
 
 $rpc_py bdev_ocf_get_bdevs | jq -e \
 	'.[0] | .started and .cache.attached and .core.attached'

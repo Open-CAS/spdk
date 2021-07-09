@@ -197,11 +197,12 @@ struct cleaning_ctx {
 
 void vbdev_ocf_construct(
 	const char *vbdev_name,
-	const char *cache_mode_name,
-	const uint64_t cache_line_size,
 	const char *cache_name,
 	const char *core_name,
-	bool loadq,
+	const char *cache_mode_name,
+	const uint64_t cache_line_size,
+	bool create,
+	bool force,
 	void (*cb)(int, struct vbdev_ocf *, void *),
 	void *cb_arg);
 

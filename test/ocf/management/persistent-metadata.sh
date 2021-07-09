@@ -62,10 +62,10 @@ waitforlisten $spdk_pid
 
 # Create ocf on persistent storage
 
-$rpc_py bdev_ocf_create ocfWT wt Nvme0n1p0 Nvme0n1p1
-$rpc_py bdev_ocf_create ocfPT pt Nvme0n1p2 Nvme0n1p3
-$rpc_py bdev_ocf_create ocfWB0 wb Nvme0n1p4 Nvme0n1p5
-$rpc_py bdev_ocf_create ocfWB1 wb Nvme0n1p4 Nvme0n1p6
+$rpc_py bdev_ocf_create ocfWT Nvme0n1p0 Nvme0n1p1 --cache-mode wt --create --force
+$rpc_py bdev_ocf_create ocfPT Nvme0n1p2 Nvme0n1p3 --cache-mode pt --create --force
+$rpc_py bdev_ocf_create ocfWB0 Nvme0n1p4 Nvme0n1p5 --cache-mode wb --create --force
+$rpc_py bdev_ocf_create ocfWB1 Nvme0n1p4 Nvme0n1p6 --cache-mode wb --create --force
 
 # Sorting bdevs because we dont guarantee that they are going to be
 # in the same order after shutdown
@@ -83,6 +83,11 @@ trap 'killprocess $spdk_pid; rm -f $curdir/config ocf_bdevs ocf_bdevs_verify; ex
 
 waitforlisten $spdk_pid
 sleep 5
+
+$rpc_py bdev_ocf_create ocfWT Nvme0n1p0 Nvme0n1p1
+$rpc_py bdev_ocf_create ocfPT Nvme0n1p2 Nvme0n1p3
+$rpc_py bdev_ocf_create ocfWB0 Nvme0n1p4 Nvme0n1p5
+$rpc_py bdev_ocf_create ocfWB1 Nvme0n1p4 Nvme0n1p6
 
 # OCF should be loaded now as well
 

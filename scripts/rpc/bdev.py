@@ -239,6 +239,35 @@ def bdev_ocf_set_seqcutoff(client, name, policy, threshold):
     return client.call('bdev_ocf_set_seqcutoff', params)
 
 
+def bdev_ocf_flush_start(client, name):
+    """Start flushing OCF cache device
+
+    Args:
+        name: name of OCF bdev
+    """
+    params = {
+        'name': name,
+    }
+
+    return client.call('bdev_ocf_flush_start', params)
+
+
+def bdev_ocf_flush_status(client, name):
+    """Get flush status of OCF cache device
+
+    Args:
+        name: name of OCF bdev
+
+    Returns:
+        Flush status
+    """
+    params = {
+        'name': name,
+    }
+
+    return client.call('bdev_ocf_flush_status', params)
+
+
 @deprecated_alias('construct_malloc_bdev')
 def bdev_malloc_create(client, num_blocks, block_size, name=None, uuid=None):
     """Construct a malloc block device.

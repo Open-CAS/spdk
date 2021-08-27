@@ -2113,6 +2113,7 @@ cache_mode              | Optional | string      | OCF cache mode: wb, wt, pt, w
 cache_line_size         | Optional | int         | OCF cache line size in KiB: 4, 8, 16, 32, 64
 create                  | Optional | bool        | Creates a new cache instance if no metadata exists
 force                   | Optional | bool        | Force creating a new cache instance, even if metadata already exists
+cpu_mask                | Optional | string      | CPUs to which background tasks will be pinned to
 
 #### Result
 
@@ -2131,7 +2132,8 @@ Example request:
     "cache_mode": "wb",
     "cache_line_size": 64,
     "create": true,
-    "force": true
+    "force": true,
+    "cpu_mask": "0x4"
   },
   "jsonrpc": "2.0",
   "method": "bdev_ocf_create",

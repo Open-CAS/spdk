@@ -47,6 +47,7 @@ struct rpc_bdev_ocf_create {
 	uint64_t cache_line_size;	/* OCF cache line size */
 	bool create;			/* Create new cache instance */
 	bool force;			/* Force creating new cache instance */
+	char *cpu_mask;		/* CPU mask for background operations */
 };
 
 static void
@@ -56,6 +57,7 @@ free_rpc_bdev_ocf_create(struct rpc_bdev_ocf_create *r)
 	free(r->cache_bdev_name);
 	free(r->core_bdev_name);
 	free(r->cache_mode);
+	free(r->cpu_mask);
 }
 
 /* Structure to decode the input parameters for this RPC method. */
@@ -67,6 +69,7 @@ static const struct spdk_json_object_decoder rpc_bdev_ocf_create_decoders[] = {
 	{"cache_line_size", offsetof(struct rpc_bdev_ocf_create, cache_line_size), spdk_json_decode_uint64, true},
 	{"create", offsetof(struct rpc_bdev_ocf_create, create), spdk_json_decode_bool, true},
 	{"force", offsetof(struct rpc_bdev_ocf_create, force), spdk_json_decode_bool, true},
+	{"cpu_mask", offsetof(struct rpc_bdev_ocf_create, cpu_mask), spdk_json_decode_string, true},
 };
 
 static void
@@ -111,7 +114,8 @@ rpc_bdev_ocf_create(struct spdk_jsonrpc_request *request,
 	}
 
 	vbdev_ocf_construct(req.name, req.cache_bdev_name, req.core_bdev_name, req.cache_mode,
-			    req.cache_line_size, req.create, req.force, construct_cb, request);
+			    req.cache_line_size, req.create, req.force, req.cpu_mask, construct_cb, request);
+
 	free_rpc_bdev_ocf_create(&req);
 }
 SPDK_RPC_REGISTER("bdev_ocf_create", rpc_bdev_ocf_create, SPDK_RPC_RUNTIME)

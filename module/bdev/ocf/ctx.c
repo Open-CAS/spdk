@@ -39,7 +39,12 @@
 #include "ctx.h"
 #include "data.h"
 
+#include "vbdev_ocf.h"
+
 ocf_ctx_t vbdev_ocf_ctx;
+
+/* Polling period is a multiple of 1ms */
+#define CLEANER_POLLER_PERIOD_BASE	1000
 
 static ctx_data_t *
 vbdev_ocf_ctx_data_alloc(uint32_t pages)
@@ -322,13 +327,17 @@ void vbdev_ocf_cache_ctx_get(struct vbdev_ocf_cache_ctx *ctx)
 }
 
 struct cleaner_priv {
-	struct spdk_poller *poller;
+	struct spdk_poller *cleaner_poller;
+	struct spdk_poller *queue_poller;
+	struct spdk_thread *thread;
 	ocf_queue_t         queue;
+	ocf_cleaner_t       cleaner;
 	uint64_t            next_run;
+	uint64_t            iteration;
 };
 
 static int
-cleaner_poll(void *arg)
+cleaner_queue_poll(void *arg)
 {
 	ocf_cleaner_t cleaner = arg;
 	struct cleaner_priv *priv = ocf_cleaner_get_priv(cleaner);
@@ -339,11 +348,6 @@ cleaner_poll(void *arg)
 		ocf_queue_run_single(priv->queue);
 	}
 
-	if (spdk_get_ticks() >= priv->next_run) {
-		ocf_cleaner_run(cleaner, priv->queue);
-		return SPDK_POLLER_BUSY;
-	}
-
 	if (iono > 0) {
 		return SPDK_POLLER_BUSY;
 	} else {
@@ -351,12 +355,27 @@ cleaner_poll(void *arg)
 	}
 }
 
+static int
+cleaner_poll(void *arg)
+{
+	ocf_cleaner_t cleaner = arg;
+	struct cleaner_priv *priv = ocf_cleaner_get_priv(cleaner);
+
+	if (priv->iteration++ >= priv->next_run) {
+		ocf_cleaner_run(cleaner, priv->queue);
+		return SPDK_POLLER_BUSY;
+	}
+
+	return SPDK_POLLER_IDLE;
+}
+
 static void
 cleaner_cmpl(ocf_cleaner_t c, uint32_t interval)
 {
 	struct cleaner_priv *priv = ocf_cleaner_get_priv(c);
 
-	priv->next_run = spdk_get_ticks() + ((interval * spdk_get_ticks_hz()) / 1000);
+	priv->iteration = 0;
+	priv->next_run = interval;
 }
 
 static void
@@ -370,7 +389,6 @@ cleaner_queue_stop(ocf_queue_t q)
 	struct cleaner_priv *cpriv = ocf_queue_get_priv(q);
 
 	if (cpriv) {
-		spdk_poller_unregister(&cpriv->poller);
 		free(cpriv);
 	}
 }
@@ -381,6 +399,21 @@ const struct ocf_queue_ops cleaner_queue_ops = {
 	.stop = cleaner_queue_stop,
 };
 
+static void
+_vbdev_ocf_ctx_cleaner_poller_init(void *ctx)
+{
+	ocf_cleaner_t c = ctx;
+	struct cleaner_priv *priv = ocf_cleaner_get_priv(c);
+	ocf_cache_t cache = ocf_cleaner_get_cache(c);
+	struct vbdev_ocf_cache_ctx *cctx  = ocf_cache_get_priv(cache);
+
+	priv->cleaner_poller = SPDK_POLLER_REGISTER(cleaner_poll, priv->cleaner,
+			       CLEANER_POLLER_PERIOD_BASE);
+	priv->queue_poller = SPDK_POLLER_REGISTER(cleaner_queue_poll, priv->cleaner, 0);
+	cctx->cleaner_cache_channel = spdk_bdev_get_io_channel(cctx->vbdev->cache.desc);
+	cctx->cleaner_core_channel = spdk_bdev_get_io_channel(cctx->vbdev->core.desc);
+}
+
 static int
 vbdev_ocf_ctx_cleaner_init(ocf_cleaner_t c)
 {
@@ -388,6 +421,7 @@ vbdev_ocf_ctx_cleaner_init(ocf_cleaner_t c)
 	struct cleaner_priv        *priv  = calloc(1, sizeof(*priv));
 	ocf_cache_t                 cache = ocf_cleaner_get_cache(c);
 	struct vbdev_ocf_cache_ctx *cctx  = ocf_cache_get_priv(cache);
+	struct spdk_cpuset cpumask = {};
 
 	if (priv == NULL) {
 		return -ENOMEM;
@@ -399,6 +433,21 @@ vbdev_ocf_ctx_cleaner_init(ocf_cleaner_t c)
 		return rc;
 	}
 
+	if (cctx->vbdev->cpu_mask) {
+		rc = spdk_cpuset_parse(&cpumask, cctx->vbdev->cpu_mask);
+		if (rc) {
+			vbdev_ocf_queue_put(priv->queue);
+			free(priv);
+			return rc;
+		}
+
+		priv->thread = spdk_thread_create("ocf_cleaner", &cpumask);
+	} else {
+		priv->thread = spdk_get_thread();
+	}
+
+	priv->cleaner = c;
+
 	ocf_queue_set_priv(priv->queue, priv);
 
 	cctx->cleaner_queue  = priv->queue;
@@ -406,7 +455,30 @@ vbdev_ocf_ctx_cleaner_init(ocf_cleaner_t c)
 	ocf_cleaner_set_cmpl(c, cleaner_cmpl);
 	ocf_cleaner_set_priv(c, priv);
 
+	spdk_thread_send_msg(priv->thread, _vbdev_ocf_ctx_cleaner_poller_init, c);
+
 	return 0;
+}
+
+static void
+_vbdev_ocf_ctx_cleaner_poller_deinit(void *ctx)
+{
+	ocf_cleaner_t c = ctx;
+	struct cleaner_priv *priv = ocf_cleaner_get_priv(c);
+	ocf_cache_t cache = ocf_cleaner_get_cache(c);
+	struct vbdev_ocf_cache_ctx *cctx  = ocf_cache_get_priv(cache);
+	struct spdk_thread *thread = priv->thread;
+
+	spdk_put_io_channel(cctx->cleaner_cache_channel);
+	spdk_put_io_channel(cctx->cleaner_core_channel);
+
+	spdk_poller_unregister(&priv->cleaner_poller);
+	spdk_poller_unregister(&priv->queue_poller);
+	vbdev_ocf_queue_put(priv->queue);
+
+	if (cctx->vbdev->cpu_mask) {
+		spdk_thread_exit(thread);
+	}
 }
 
 static void
@@ -414,21 +486,12 @@ vbdev_ocf_ctx_cleaner_stop(ocf_cleaner_t c)
 {
 	struct cleaner_priv *priv = ocf_cleaner_get_priv(c);
 
-	vbdev_ocf_queue_put(priv->queue);
+	spdk_thread_send_msg(priv->thread, _vbdev_ocf_ctx_cleaner_poller_deinit, c);
 }
 
 static void
-vbdev_ocf_ctx_cleaner_kick(ocf_cleaner_t cleaner)
+vbdev_ocf_ctx_cleaner_kick(ocf_cleaner_t c)
 {
-	struct cleaner_priv *priv  = ocf_cleaner_get_priv(cleaner);
-
-	if (priv->poller) {
-		return;
-	}
-
-	/* We start cleaner poller at the same thread where cache was created
-	 * TODO: allow user to specify core at which cleaner should run */
-	priv->poller = SPDK_POLLER_REGISTER(cleaner_poll, cleaner, 0);
 }
 
 /* This function is main way by which OCF communicates with user

@@ -235,7 +235,16 @@ prepare_submit(struct ocf_io *io)
 		return -EFAULT;
 	}
 
-	if (q == cctx->cleaner_queue || q == cctx->mngt_queue) {
+	if (q == cctx->cleaner_queue) {
+		if (base->is_cache) {
+			io_ctx->ch = cctx->cleaner_cache_channel;
+		} else {
+			io_ctx->ch = cctx->cleaner_core_channel;
+		}
+		return 0;
+	}
+
+	if (q == cctx->mngt_queue) {
 		io_ctx->ch = base->management_channel;
 		return 0;
 	}

@@ -136,7 +136,7 @@ def bdev_crypto_delete(client, name):
 
 
 @deprecated_alias('construct_ocf_bdev')
-def bdev_ocf_create(client, name, cache_bdev_name, core_bdev_name, cache_mode, cache_line_size, create, force):
+def bdev_ocf_create(client, name, cache_bdev_name, core_bdev_name, cache_mode, cache_line_size, create, force, cpu_mask):
     """Add an OCF block device
 
     Args:
@@ -147,6 +147,7 @@ def bdev_ocf_create(client, name, cache_bdev_name, core_bdev_name, cache_mode, c
         cache_line_size: OCF cache line size. The unit is KiB: {4, 8, 16, 32, 64}
         create: Creates a new cache instance if no metadata exists
         force: Force creating a new cache instance, even if metadata already exists
+        cpu_mask: CPUs to which background tasks will be pinned to
 
     Returns:
         Name of created block device
@@ -159,6 +160,7 @@ def bdev_ocf_create(client, name, cache_bdev_name, core_bdev_name, cache_mode, c
         'cache_line_size': cache_line_size,
         'create': create,
         'force': force,
+        'cpu_mask': cpu_mask,
     }
 
     return client.call('bdev_ocf_create', params)

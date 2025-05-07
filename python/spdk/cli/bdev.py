@@ -106,19 +106,21 @@ def add_parser(subparsers):
     def bdev_ocf_start_cache(args):
         print_json(args.client.bdev_ocf_start_cache(
                                                  cache_name=args.cache_name,
-                                                 bdev_name=args.bdev_name,
+                                                 base_name=args.base_name,
                                                  cache_mode=args.cache_mode,
-                                                 cache_line_size=args.cache_line_size))
+                                                 cache_line_size=args.cache_line_size,
+                                                 no_load=args.no_load))
     p = subparsers.add_parser('bdev_ocf_start_cache', help='Start OCF cache instance')
     p.add_argument('cache_name', help='name for the new OCF cache vbdev')
-    p.add_argument('bdev_name', help='name of the bdev to use as cache')
-    p.add_argument('--cache-mode',
+    p.add_argument('base_name', help='name of the base bdev to use as cache')
+    p.add_argument('-m', '--cache-mode',
                    help='choose between {wt|wb|wa|wo|wi|pt}; default wt (Write-Through)',
                    choices=['wt', 'wb', 'wa', 'wo', 'wi', 'pt'])
-    p.add_argument('--cache-line-size',
+    p.add_argument('-l', '--cache-line-size',
                    help='choose between {4|8|16|32|64}; default 4 [KiB]',
                    type=int,
                    choices=[4, 8, 16, 32, 64])
+    p.add_argument('-n', '--no-load', action='store_true', help='do not load previous cache instance from metadata and force starting a new one instead (WARNING: all cache metadata will be discarded!)')
     p.set_defaults(func=bdev_ocf_start_cache)
 
     def bdev_ocf_stop_cache(args):
@@ -127,21 +129,39 @@ def add_parser(subparsers):
     p.add_argument('cache_name', help='name of the cache vbdev to stop')
     p.set_defaults(func=bdev_ocf_stop_cache)
 
+    def bdev_ocf_detach_cache(args):
+        args.client.bdev_ocf_detach_cache(cache_name=args.cache_name)
+    p = subparsers.add_parser('bdev_ocf_detach_cache', help='Detach caching device from OCF cache')
+    p.add_argument('cache_name', help='name of the cache vbdev to detach device from')
+    p.set_defaults(func=bdev_ocf_detach_cache)
+
+    def bdev_ocf_attach_cache(args):
+        args.client.bdev_ocf_attach_cache(
+                                       cache_name=args.cache_name,
+                                       base_name=args.base_name,
+                                       force=args.force)
+    p = subparsers.add_parser('bdev_ocf_attach_cache', help='Attach caching device to OCF cache')
+    p.add_argument('cache_name', help='name of the cache vbdev to attach device to')
+    p.add_argument('base_name', help='name of the base bdev to use as caching device')
+    p.add_argument('-f', '--force', action='store_true', help='discard cache metadata if present on device')
+    p.set_defaults(func=bdev_ocf_attach_cache)
+
     def bdev_ocf_add_core(args):
         print_json(args.client.bdev_ocf_add_core(
                                               core_name=args.core_name,
-                                              bdev_name=args.bdev_name,
+                                              base_name=args.base_name,
                                               cache_name=args.cache_name))
     p = subparsers.add_parser('bdev_ocf_add_core', help='Add core device to OCF cache')
     p.add_argument('core_name', help='name for the new OCF core vbdev')
-    p.add_argument('bdev_name', help='name of the bdev to use as core')
+    p.add_argument('base_name', help='name of the base bdev to use as core')
     p.add_argument('cache_name', help='name of already started OCF cache vbdev')
     p.set_defaults(func=bdev_ocf_add_core)
 
     def bdev_ocf_remove_core(args):
-        args.client.bdev_ocf_remove_core(core_name=args.core_name)
+        args.client.bdev_ocf_remove_core(core_name=args.core_name, cache_name=args.cache_name)
     p = subparsers.add_parser('bdev_ocf_remove_core', help='Remove core device from OCF cache')
     p.add_argument('core_name', help='name of the core vbdev to remove from OCF cache instance')
+    p.add_argument('cache_name', help='name of the cache vbdev to remove core from')
     p.set_defaults(func=bdev_ocf_remove_core)
 
     def bdev_ocf_get_bdevs(args):

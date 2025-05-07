@@ -341,7 +341,7 @@ vbdev_ocf_ctx_cleaner_init(ocf_cleaner_t c)
 		return -ENOMEM;
 	}
 
-	priv->mngt_queue = vbdev_ocf_cache->ocf_cache_mngt_q;
+	priv->mngt_queue = vbdev_ocf_cache->cache_mngt_q;
 
 	ocf_cleaner_set_cmpl(c, cleaner_cmpl);
 	ocf_cleaner_set_priv(c, priv);

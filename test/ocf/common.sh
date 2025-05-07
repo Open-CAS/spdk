@@ -1,24 +1,31 @@
+#
 #  SPDX-License-Identifier: BSD-3-Clause
-#  Copyright (C) 2020 Intel Corporation
+#  Copyright (C) 2025 Huawei Technologies
 #  All rights reserved.
 #
 
-source $rootdir/scripts/common.sh
-source $rootdir/test/common/autotest_common.sh
+source "$rootdir/test/common/autotest_common.sh"
 
-rpc_py=$rootdir/scripts/rpc.py
+rpc_py="$rootdir/scripts/rpc.py"
 
-function clear_nvme() {
-	mapfile -t bdf < <(get_first_nvme_bdf)
+start_spdk() {
+	$SPDK_BIN_DIR/spdk_tgt "$@" &
+	spdk_pid=$!
+	trap 'killprocess $spdk_pid; exit 1' SIGINT SIGTERM EXIT
+	waitforlisten $spdk_pid
+}
 
-	# Clear metadata on NVMe device
-	$rootdir/scripts/setup.sh reset
+stop_spdk() {
+	trap - SIGINT SIGTERM EXIT
+	killprocess $spdk_pid
+}
 
-	name=$(get_nvme_name_from_bdf "${bdf[0]}")
-	mountpoints=$(lsblk /dev/$name --output MOUNTPOINT -n | wc -w)
-	if [ "$mountpoints" != "0" ]; then
-		exit 1
-	fi
-	dd if=/dev/zero of=/dev/$name bs=1M count=1000 oflag=direct
-	$rootdir/scripts/setup.sh
+# Convert an array of items to comma separated list of items.
+array_to_comma_list() {
+	# $1: name of array variable
+	# stdout: string with comma separated elements
+
+	IFS=","
+	declare -n array="$1"
+	echo "${array[*]}"
 }

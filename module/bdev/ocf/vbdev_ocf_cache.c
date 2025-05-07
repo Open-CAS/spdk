@@ -7,34 +7,60 @@
 #include "ctx.h"
 #include "utils.h"
 
-struct vbdev_ocf_caches_head g_vbdev_ocf_caches = STAILQ_HEAD_INITIALIZER(g_vbdev_ocf_caches);
-
 int
-vbdev_ocf_cache_create(const char *cache_name, struct vbdev_ocf_cache **out)
+vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cache_mode,
+		       const uint8_t cache_line_size, bool no_load)
 {
-	struct vbdev_ocf_cache *cache;
+	ocf_cache_t cache;
+	struct ocf_mngt_cache_config *cache_cfg;
+	struct ocf_mngt_cache_attach_config *cache_att_cfg;
+	struct vbdev_ocf_cache *cache_ctx;
 	int rc = 0;
 
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': allocating vbdev_ocf_cache and adding it to cache list\n",
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': allocating structs and starting cache\n",
 		      cache_name);
 
-	cache = calloc(1, sizeof(struct vbdev_ocf_cache));
-	if (!cache) {
-		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for vbdev_ocf_cache\n",
+	cache_ctx = calloc(1, sizeof(struct vbdev_ocf_cache));
+	if (!cache_ctx) {
+		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for cache context\n",
 			    cache_name);
 		return -ENOMEM;
 	}
 
-	cache->name = strdup(cache_name);
-	if (!cache->name) {
-		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for vbdev_ocf_cache name\n",
-			    cache_name);
-		free(cache);
-		return -ENOMEM;
+	cache_cfg = &cache_ctx->cache_cfg;
+	cache_att_cfg = &cache_ctx->cache_att_cfg;
+
+	ocf_mngt_cache_config_set_default(cache_cfg);
+	ocf_mngt_cache_attach_config_set_default(cache_att_cfg);
+
+	strncpy(cache_cfg->name, cache_name, OCF_CACHE_NAME_SIZE);
+	if (cache_mode) {
+		cache_cfg->cache_mode = ocf_get_cache_mode(cache_mode);
+	}
+	if (cache_line_size) {
+		cache_cfg->cache_line_size = cache_line_size * KiB;
+		cache_att_cfg->cache_line_size = cache_line_size * KiB;
+	}
+	cache_cfg->locked = true;
+	cache_att_cfg->open_cores = false;
+	cache_att_cfg->discard_on_start = false; // needed ?
+	cache_att_cfg->device.perform_test = false; // needed ?
+	cache_att_cfg->force = no_load;
+
+	if ((rc = ocf_mngt_cache_start(vbdev_ocf_ctx, &cache, cache_cfg, cache_ctx))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to start OCF cache\n", cache_name);
+		free(cache_ctx);
+		return rc;
 	}
 
-	STAILQ_INIT(&cache->cores);
-	STAILQ_INSERT_TAIL(&g_vbdev_ocf_caches, cache, link);
+	// needed ?
+	//if ((rc = ocf_mngt_cache_get(cache))) {
+	//	SPDK_ERRLOG("OCF cache '%s': failed to increment cache ref count: %s\n",
+	//		    cache_name, spdk_strerror(-rc));
+	//	ocf_mngt_cache_stop(cache, NULL, NULL); // needs callback (_cache_start_err_cb ?)
+	//	free(cache_ctx);
+	//	return rc;
+	//}
 
 	*out = cache;
 
@@ -42,168 +68,131 @@ vbdev_ocf_cache_create(const char *cache_name, struct vbdev_ocf_cache **out)
 }
 
 void
-vbdev_ocf_cache_destroy(struct vbdev_ocf_cache *cache)
+vbdev_ocf_cache_destroy(ocf_cache_t cache)
 {
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': deallocating vbdev_ocf_cache and removing it from cache list\n",
-		      cache->name);
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 
-	STAILQ_REMOVE(&g_vbdev_ocf_caches, cache, vbdev_ocf_cache, link);
-	free(cache->name);
-	free(cache);
-}
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': deallocating structs\n",
+		      ocf_cache_get_name(cache));
 
-int
-vbdev_ocf_cache_set_config(struct vbdev_ocf_cache *cache, const char *cache_mode,
-			   const uint8_t cache_line_size)
-{
-	struct ocf_mngt_cache_config *ocf_cache_cfg = &cache->ocf_cache_cfg;
-	struct ocf_mngt_cache_attach_config *ocf_cache_att_cfg = &cache->ocf_cache_att_cfg;
-	int rc = 0;
-
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting OCF config\n", cache->name);
-
-	ocf_mngt_cache_config_set_default(ocf_cache_cfg);
-	ocf_mngt_cache_attach_config_set_default(ocf_cache_att_cfg);
-
-	strncpy(ocf_cache_cfg->name, cache->name, OCF_CACHE_NAME_SIZE);
-	if (cache_mode) {
-		ocf_cache_cfg->cache_mode = ocf_get_cache_mode(cache_mode);
-	}
-	if (cache_line_size) {
-		ocf_cache_cfg->cache_line_size = cache_line_size * KiB;
-		ocf_cache_att_cfg->cache_line_size = cache_line_size * KiB;
-	}
-	ocf_cache_cfg->locked = true;
-	ocf_cache_att_cfg->open_cores = false;
-	ocf_cache_att_cfg->discard_on_start = false; // needed ?
-	ocf_cache_att_cfg->device.perform_test = false; // needed ?
-	// TODO: add load option
-	ocf_cache_att_cfg->force = true;
-
-	return rc; // rm?
+	free(cache_ctx);
 }
 
 // vbdev_ocf_cache_detach() instead of this ?
 static void
 vbdev_ocf_cache_hotremove(struct spdk_bdev *bdev, void *event_ctx)
 {
-	struct vbdev_ocf_cache *cache = event_ctx;
+	ocf_cache_t cache = event_ctx;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': hot removal of base bdev '%s'\n",
-		      cache->name, bdev->name);
+		      ocf_cache_get_name(cache), spdk_bdev_get_name(bdev));
 
-	assert(bdev == cache->base.bdev);
+	assert(bdev == ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->base.bdev);
 
-	if (vbdev_ocf_cache_is_running(cache)) {
-		// OCF cache flush
+	if (ocf_cache_is_device_attached(cache)) { // always true?
 		// OCF cache detach
 		// (to comply with SPDK hotremove support)
 	}
 
-	vbdev_ocf_cache_base_detach(cache);
+	vbdev_ocf_cache_base_detach(cache); // in detach callback ?
 }
 
 static void
 _vbdev_ocf_cache_event_cb(enum spdk_bdev_event_type type, struct spdk_bdev *bdev, void *event_ctx)
 {
-	struct vbdev_ocf_cache *cache = event_ctx;
+	ocf_cache_t cache = event_ctx;
 
 	switch (type) {
 	case SPDK_BDEV_EVENT_REMOVE:
 		vbdev_ocf_cache_hotremove(bdev, event_ctx);
 		break;
 	default:
-		SPDK_NOTICELOG("OCF cache '%s': unsupported bdev event type: %d\n", cache->name, type);
+		SPDK_NOTICELOG("OCF cache '%s': unsupported bdev event type: %d\n",
+			       ocf_cache_get_name(cache), type);
 	}
 }
 
 int
-vbdev_ocf_cache_base_attach(struct vbdev_ocf_cache *cache, const char *bdev_name)
+vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name)
 {
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+	struct vbdev_ocf_base *base = &cache_ctx->base;
+	struct ocf_volume_uuid volume_uuid;
 	int rc = 0;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': attaching base bdev '%s'\n",
-		      cache->name, bdev_name);
+		      ocf_cache_get_name(cache), base_name);
 
-	if ((rc = spdk_bdev_open_ext(bdev_name, true, _vbdev_ocf_cache_event_cb, cache, &cache->base.desc))) {
+	//strncpy(base->name, base_name, OCF_CACHE_NAME_SIZE);
+
+	if ((rc = spdk_bdev_open_ext(base_name, true, _vbdev_ocf_cache_event_cb, cache, &base->desc))) {
 		return rc;
 	}
 
-	if ((rc = spdk_bdev_module_claim_bdev_desc(cache->base.desc,
-						   SPDK_BDEV_CLAIM_READ_MANY_WRITE_ONE,
+	if ((rc = spdk_bdev_module_claim_bdev_desc(base->desc, SPDK_BDEV_CLAIM_READ_MANY_WRITE_ONE,
 						   NULL, &ocf_if))) {
-		SPDK_ERRLOG("OCF cache '%s': failed to claim base bdev '%s'\n", cache->name, bdev_name);
-		spdk_bdev_close(cache->base.desc);
+		SPDK_ERRLOG("OCF cache '%s': failed to claim base bdev '%s'\n",
+			    ocf_cache_get_name(cache), base_name);
+		spdk_bdev_close(base->desc);
 		return rc;
 	}
 
-	cache->base.mngt_ch = spdk_bdev_get_io_channel(cache->base.desc);
-	if (!cache->base.mngt_ch) {
+	base->mngt_ch = spdk_bdev_get_io_channel(base->desc);
+	if (!base->mngt_ch) {
 		SPDK_ERRLOG("OCF cache '%s': failed to get IO channel for base bdev '%s'\n",
-			    cache->name, bdev_name);
-		spdk_bdev_close(cache->base.desc);
+			    ocf_cache_get_name(cache), base_name);
+		spdk_bdev_close(base->desc);
 		return -ENOMEM;
 	}
 
-	cache->base.bdev = spdk_bdev_desc_get_bdev(cache->base.desc);
-	cache->base.thread = spdk_get_thread();
-	cache->base.is_cache = true;
-	cache->base.attached = true;
+	base->bdev = spdk_bdev_desc_get_bdev(base->desc);
+	base->thread = spdk_get_thread();
+	base->is_cache = true;
+	base->attached = true;
+
+	if ((rc = ocf_uuid_set_str(&volume_uuid, (char *)base_name))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to set OCF volume uuid\n",
+			    ocf_cache_get_name(cache));
+		spdk_put_io_channel(base->mngt_ch);
+		spdk_bdev_close(base->desc);
+		return rc;
+	}
+
+	if ((rc = ocf_ctx_volume_create(vbdev_ocf_ctx, &cache_ctx->cache_att_cfg.device.volume,
+					&volume_uuid, SPDK_OBJECT))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to create OCF volume\n", ocf_cache_get_name(cache));
+		spdk_put_io_channel(base->mngt_ch);
+		spdk_bdev_close(base->desc);
+		return rc;
+	}
+
+	// for ocf_volume_open() in ocf_mngt_cache_attach/load()
+	cache_ctx->cache_att_cfg.device.volume_params = base;
 
 	// why not ? what is it then ?!?
-	//assert(__bdev_to_io_dev(cache->base.bdev) == cache->base.bdev->ctxt);
+	//assert(__bdev_to_io_dev(base->bdev) == base->bdev->ctxt);
 
 	return rc;
 }
 
 void
-vbdev_ocf_cache_base_detach(struct vbdev_ocf_cache *cache)
+vbdev_ocf_cache_base_detach(ocf_cache_t cache)
 {
-	struct vbdev_ocf_base *base = &cache->base;
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+	struct vbdev_ocf_base *base = &cache_ctx->base;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': detaching base bdev '%s'\n",
-		      cache->name, base->bdev->name);
+		      ocf_cache_get_name(cache), spdk_bdev_get_name(base->bdev));
+
+
+	//if (cache_ctx->cache_att_cfg.device.volume) {
+	//	ocf_volume_destroy(cache_ctx->cache_att_cfg.device.volume);
+	//	cache_ctx->cache_att_cfg.device.volume = NULL;
+	//	//cache_ctx->cache_att_cfg.device.volume_params = NULL; // ?
+	//}
+	ocf_volume_destroy(cache_ctx->cache_att_cfg.device.volume);
 
 	vbdev_ocf_base_detach(base);
-}
-
-int
-vbdev_ocf_cache_add_incomplete(struct vbdev_ocf_cache *cache, const char *bdev_name)
-{
-	struct vbdev_ocf_cache_init_params *init_params;
-
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': allocating init params\n", cache->name);
-
-	init_params = calloc(1, sizeof(struct vbdev_ocf_cache_init_params));
-	if (!init_params) {
-		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for init params\n",
-			    cache->name);
-		return -ENOMEM;
-	}
-
-	init_params->bdev_name = strdup(bdev_name);
-	if (!init_params->bdev_name) {
-		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for base bdev name\n",
-			    cache->name);
-		free(init_params);
-		return -ENOMEM;
-	}
-
-	cache->init_params = init_params;
-
-	return 0;
-}
-
-void
-vbdev_ocf_cache_remove_incomplete(struct vbdev_ocf_cache *cache)
-{
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': deallocating init params\n", cache->name);
-
-	free(cache->init_params->bdev_name);
-	free(cache->init_params);
-	/* It's important to set init_params back to NULL.
-	 * This is an indicator that cache is not incomplete any more. */
-	cache->init_params = NULL;
 }
 
 static void
@@ -221,7 +210,7 @@ vbdev_ocf_cache_mngt_queue_stop(ocf_queue_t queue)
 	struct vbdev_ocf_cache_mngt_queue_ctx *mngt_q_ctx = ocf_queue_get_priv(queue);
 	
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': destroying OCF management queue\n",
-		      mngt_q_ctx->cache->name);
+		      ocf_cache_get_name(mngt_q_ctx->cache));
 
 	if (mngt_q_ctx->thread && mngt_q_ctx->thread != spdk_get_thread()) {
 		spdk_thread_send_msg(mngt_q_ctx->thread, _cache_mngt_queue_stop, mngt_q_ctx);
@@ -242,31 +231,35 @@ const struct ocf_queue_ops cache_mngt_queue_ops = {
 };
 
 int
-vbdev_ocf_cache_mngt_queue_create(struct vbdev_ocf_cache *cache)
+vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 {
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 	struct vbdev_ocf_cache_mngt_queue_ctx *mngt_q_ctx;
 	int rc = 0;
 
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': creating OCF management queue\n", cache->name);
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': creating OCF management queue\n",
+		      ocf_cache_get_name(cache));
 
 	mngt_q_ctx = calloc(1, sizeof(struct vbdev_ocf_cache_mngt_queue_ctx));
 	if (!mngt_q_ctx) {
 		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for management queue context\n",
-			    cache->name);
+			    ocf_cache_get_name(cache));
 		return -ENOMEM;
 	}
 
-	if ((rc = vbdev_ocf_queue_create_mngt(cache->ocf_cache, &cache->ocf_cache_mngt_q, &cache_mngt_queue_ops))) {
-		SPDK_ERRLOG("OCF cache '%s': failed to create OCF management queue\n", cache->name);
+	if ((rc = vbdev_ocf_queue_create_mngt(cache, &cache_ctx->cache_mngt_q, &cache_mngt_queue_ops))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to create OCF management queue\n",
+			    ocf_cache_get_name(cache));
 		free(mngt_q_ctx);
 		return rc;
 	}
-	ocf_queue_set_priv(cache->ocf_cache_mngt_q, mngt_q_ctx);
+	ocf_queue_set_priv(cache_ctx->cache_mngt_q, mngt_q_ctx);
 
-	mngt_q_ctx->poller = SPDK_POLLER_REGISTER(vbdev_ocf_queue_poller, cache->ocf_cache_mngt_q, 1000);
+	mngt_q_ctx->poller = SPDK_POLLER_REGISTER(vbdev_ocf_queue_poller, cache_ctx->cache_mngt_q, 1000);
 	if (!mngt_q_ctx->poller) {
-		SPDK_ERRLOG("OCF cache '%s': failed to create management queue poller\n", cache->name);
-		vbdev_ocf_queue_put(cache->ocf_cache_mngt_q);
+		SPDK_ERRLOG("OCF cache '%s': failed to create management queue poller\n",
+			    ocf_cache_get_name(cache));
+		vbdev_ocf_queue_put(cache_ctx->cache_mngt_q);
 		return -ENOMEM;
 	}
 
@@ -276,33 +269,25 @@ vbdev_ocf_cache_mngt_queue_create(struct vbdev_ocf_cache *cache)
 	return rc;
 }
 
-struct vbdev_ocf_cache *
-vbdev_ocf_cache_get_by_name(const char *cache_name)
-{
-	struct vbdev_ocf_cache *cache;
-
-	vbdev_ocf_foreach_cache(cache) {
-		if (strcmp(cache_name, cache->name)) {
-			continue;
-		}
-		return cache;
-	}
-	return NULL;
-}
-
 bool
-vbdev_ocf_cache_is_running(struct vbdev_ocf_cache *cache)
+vbdev_ocf_cache_is_base_attached(ocf_cache_t cache)
 {
-	ocf_cache_t ocf_cache = cache->ocf_cache;
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 
-	if (ocf_cache && ocf_cache_is_running(ocf_cache)) {
-		return true;
-	}
-	return false;
+	return cache_ctx->base.attached;
 }
 
-bool
-vbdev_ocf_cache_is_incomplete(struct vbdev_ocf_cache *cache)
-{
-	return !!cache->init_params;
-}
+//bool
+//vbdev_ocf_any_cache_started(void)
+//{
+//	/* OCF context is created with refcount set to 1 and any started cache
+//	 * will increment it further. So, if context refcount equals 1, it means
+//	 * that it's just created without any started caches. */
+//	//return (ocf_ctx_get_refcnt(vbdev_ocf_ctx) > 1) ? true : false;
+//
+//	int refcnt;
+//
+//	refcnt = ocf_ctx_get_refcnt(vbdev_ocf_ctx);
+//	printf("*** CTX refcnt: %d\n", refcnt);
+//	return (refcnt > 1) ? true : false;
+//}

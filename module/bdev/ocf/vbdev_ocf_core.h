@@ -31,6 +31,7 @@ struct vbdev_ocf_core {
 
 	struct vbdev_ocf_base			base;
 	char					cache_name[OCF_CACHE_NAME_SIZE];
+	struct vbdev_ocf_mngt_ctx *		mngt_ctx;
 
 	STAILQ_ENTRY(vbdev_ocf_core)		waitlist_entry;
 };

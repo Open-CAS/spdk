@@ -247,7 +247,7 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 		return -ENOMEM;
 	}
 
-	if ((rc = vbdev_ocf_queue_create_mngt(cache, &cache_ctx->cache_mngt_q, &cache_mngt_queue_ops))) {
+	if ((rc = ocf_queue_create_mngt(cache, &cache_ctx->cache_mngt_q, &cache_mngt_queue_ops))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to create OCF management queue\n",
 			    ocf_cache_get_name(cache));
 		free(mngt_q_ctx);
@@ -259,7 +259,7 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 	if (!mngt_q_ctx->poller) {
 		SPDK_ERRLOG("OCF cache '%s': failed to create management queue poller\n",
 			    ocf_cache_get_name(cache));
-		vbdev_ocf_queue_put(cache_ctx->cache_mngt_q);
+		ocf_queue_put(cache_ctx->cache_mngt_q);
 		return -ENOMEM;
 	}
 

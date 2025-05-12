@@ -132,6 +132,8 @@ vbdev_ocf_module_init(void)
 static void
 _module_fini_cache_stop_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
+	ocf_queue_t cache_mngt_q = ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q;
+
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': finishing stop of OCF cache\n",
 		      ocf_cache_get_name(cache));
 
@@ -140,10 +142,14 @@ _module_fini_cache_stop_cb(ocf_cache_t cache, void *cb_arg, int error)
 			    ocf_cache_get_name(cache), error);
 	}
 
-	vbdev_ocf_cache_base_detach(cache);
+	if (vbdev_ocf_cache_is_base_attached(cache)) {
+		vbdev_ocf_cache_base_detach(cache);
+	} else {
+		/* If device was not attached to cache, then cache stop won't 'put' its management queue. */
+		ocf_queue_put(cache_mngt_q);
+	}
 	vbdev_ocf_cache_destroy(cache);
 	ocf_mngt_cache_unlock(cache);
-	ocf_mngt_cache_put(cache);
 
 	if (!ocf_mngt_cache_get_count(vbdev_ocf_ctx)) {
 		spdk_bdev_module_fini_start_done();
@@ -164,6 +170,9 @@ _module_fini_cache_flush_cb(ocf_cache_t cache, void *cb_arg, int error)
 static void
 _module_fini_cache_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating stop of OCF cache\n",
+		      ocf_cache_get_name(cache));
+
 	if (error) {
 		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
 			    ocf_cache_get_name(cache), error);
@@ -176,32 +185,12 @@ _module_fini_cache_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 	}
 }
 
-static int
-_module_fini_cache_visit_stop(ocf_cache_t cache, void *cb_arg)
-{
-	int rc = 0;
-
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating stop of OCF cache\n",
-		      ocf_cache_get_name(cache));
-
-	printf("*** (cache stop) cache refcnt before get: %d\n", ocf_cache_get_refcnt(cache));
-	if ((rc = ocf_mngt_cache_get(cache))) {
-		SPDK_ERRLOG("OCF cache '%s': failed to increment ref count: %s\n",
-			    ocf_cache_get_name(cache), spdk_strerror(-rc));
-		return rc;
-	}
-	printf("*** (cache stop) cache refcnt after get: %d\n", ocf_cache_get_refcnt(cache));
-
-	ocf_mngt_cache_lock(cache, _module_fini_cache_lock_cb, cb_arg);
-
-	return rc;
-}
-
 static void
 _module_fini_core_unregister_cb(void *cb_arg, int error)
 {
 	ocf_core_t core = cb_arg;
 	ocf_cache_t cache = ocf_core_get_cache(core);
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing unregister of OCF vbdev\n",
 		      ocf_core_get_name(core));
@@ -211,13 +200,12 @@ _module_fini_core_unregister_cb(void *cb_arg, int error)
 			    ocf_core_get_name(core), spdk_strerror(-error));
 	}
 
-	printf("*** (core unregister) cache refcnt before put: %d\n", ocf_cache_get_refcnt(cache));
-	ocf_mngt_cache_put(cache); // needed ?
-	printf("*** (core unregister) cache refcnt after put: %d\n", ocf_cache_get_refcnt(cache));
+	ocf_mngt_cache_put(cache);
+	vbdev_ocf_core_destroy(core_ctx);
 
-	//if (ocf_cache_get_refcnt(cache) < 2) {
-	//	ocf_mngt_cache_lock(cache, _module_fini_cache_lock_cb, cb_arg);
-	//}
+	if (ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
+		ocf_mngt_cache_lock(cache, _module_fini_cache_lock_cb, cb_arg);
+	}
 }
 
 static int
@@ -227,13 +215,13 @@ _module_fini_core_visit(ocf_core_t core, void *cb_arg)
 	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
 	int rc = 0;
 
-	printf("*** (core unregister) cache refcnt before get: %d\n", ocf_cache_get_refcnt(cache));
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': module stop visit\n", ocf_core_get_name(core));
+
 	if ((rc = ocf_mngt_cache_get(cache))) {
 		SPDK_ERRLOG("OCF core '%s': failed to increment cache '%s' ref count: %s\n",
 			    ocf_core_get_name(core), ocf_cache_get_name(cache), spdk_strerror(-rc));
 		return rc;
 	}
-	printf("*** (core unregister) cache refcnt after get: %d\n", ocf_cache_get_refcnt(cache));
 
 	if ((rc = vbdev_ocf_core_unregister(core_ctx, _module_fini_core_unregister_cb, core))) {
 		SPDK_ERRLOG("OCF core '%s': failed to start unregistering OCF vbdev during module stop: %s\n",
@@ -248,6 +236,13 @@ static int
 _module_fini_cache_visit(ocf_cache_t cache, void *cb_arg)
 {
 	int rc = 0;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': module stop visit\n", ocf_cache_get_name(cache));
+
+	if (!ocf_cache_get_core_count(cache)) {
+		ocf_mngt_cache_lock(cache, _module_fini_cache_lock_cb, cb_arg);
+		return rc;
+	}
 
 	if ((rc = ocf_core_visit(cache, _module_fini_core_visit, cb_arg, false))) { // only opened cores ?
 		SPDK_ERRLOG("OCF: failed to iterate over core bdevs: %s\n", spdk_strerror(-rc));
@@ -278,13 +273,6 @@ vbdev_ocf_module_fini_start(void)
 
 	if ((rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _module_fini_cache_visit, NULL))) {
 		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
-		spdk_bdev_module_fini_start_done();
-		return;
-	}
-
-	// async fuckup ? (move to unregister_cb and do by refcnt)
-	if ((rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _module_fini_cache_visit_stop, NULL))) {
-		SPDK_ERRLOG("OCF: failed to iterate over cache bdevs: %s\n", spdk_strerror(-rc));
 		spdk_bdev_module_fini_start_done();
 		return;
 	}
@@ -637,8 +625,9 @@ _cache_start_rpc_attach_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		vbdev_ocf_cache_base_detach(cache);
-		vbdev_ocf_queue_put(cache_ctx->cache_mngt_q);
+		ocf_queue_put(cache_ctx->cache_mngt_q); // needed ?
 		ocf_mngt_cache_stop(cache, _cache_start_rpc_err_cb, NULL);
+		// move to ocf_mngt_cache_stop callback ?
 		if (cache_start_ctx->rpc_cb_fn) {
 			cache_start_ctx->rpc_cb_fn(NULL, cache_start_ctx->rpc_cb_arg, error); // cache name
 		}
@@ -682,6 +671,7 @@ _cache_start_rpc_metadata_probe_cb(void *priv, int error, struct ocf_metadata_pr
 	} else {
 		SPDK_NOTICELOG("OCF cache '%s': metadata found - loading cache from metadata\n",
 			       ocf_cache_get_name(cache));
+		SPDK_NOTICELOG("(start cache with '--no-load' flag to start new cache instead of loading config from metadata)\n");
 		// check status for cache_name/mode/line_size/dirty ?
 		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg,
 				    _cache_start_rpc_attach_cb, cache_start_ctx);
@@ -704,7 +694,7 @@ vbdev_ocf_cache_start(const char *cache_name, const char *base_name,
 	if (vbdev_ocf_bdev_exists(cache_name)) {
 		SPDK_ERRLOG("OCF: bdev '%s' already exists\n", cache_name);
 		rc = -EEXIST;
-		goto err_create;
+		goto err_exist;
 	}
 
 	if ((rc = vbdev_ocf_cache_create(&cache, cache_name, cache_mode, cache_line_size, no_load))) {
@@ -743,6 +733,7 @@ vbdev_ocf_cache_start(const char *cache_name, const char *base_name,
 	cache_ctx = ocf_cache_get_priv(cache);
 
 	if (no_load) {
+		SPDK_NOTICELOG("'--no-load' flag specified - starting new cache without looking for metadata\n");
 		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, _cache_start_rpc_attach_cb,
 				      cache_start_ctx);
 		return;
@@ -763,10 +754,11 @@ err_open:
 err_alloc:
 	vbdev_ocf_cache_base_detach(cache);
 err_base:
-	vbdev_ocf_queue_put(((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q);
+	ocf_queue_put(((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q);
 err_queue:
 	ocf_mngt_cache_stop(cache, _cache_start_rpc_err_cb, NULL);
 err_create:
+err_exist:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -774,6 +766,7 @@ static void
 _cache_stop_rpc_stop_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *cache_stop_ctx = cb_arg;
+	ocf_queue_t cache_mngt_q = ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': finishing stop of OCF cache\n",
 		      ocf_cache_get_name(cache));
@@ -785,7 +778,12 @@ _cache_stop_rpc_stop_cb(ocf_cache_t cache, void *cb_arg, int error)
 			    ocf_cache_get_name(cache), error);
 	} else {
 		SPDK_NOTICELOG("OCF cache '%s': stopped\n", ocf_cache_get_name(cache));
-		vbdev_ocf_cache_base_detach(cache);
+		if (vbdev_ocf_cache_is_base_attached(cache)) {
+			vbdev_ocf_cache_base_detach(cache);
+		} else {
+			/* If device was not attached to cache, then cache stop won't 'put' its management queue. */
+			ocf_queue_put(cache_mngt_q);
+		}
 		vbdev_ocf_cache_destroy(cache);
 	}
 
@@ -828,9 +826,10 @@ _cache_stop_rpc_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 static void
 _cache_stop_rpc_core_unregister_cb(void *cb_arg, int error)
 {
-	struct vbdev_ocf_mngt_ctx *cache_stop_ctx = cb_arg;
-	ocf_cache_t cache = cache_stop_ctx->cache;
-	ocf_core_t core = cache_stop_ctx->core;
+	ocf_core_t core = cb_arg;
+	ocf_cache_t cache = ocf_core_get_cache(core);
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+	struct vbdev_ocf_mngt_ctx *cache_stop_ctx = core_ctx->mngt_ctx;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing unregister of OCF vbdev\n",
 		      ocf_core_get_name(core));
@@ -840,12 +839,11 @@ _cache_stop_rpc_core_unregister_cb(void *cb_arg, int error)
 			    ocf_core_get_name(core), spdk_strerror(-error));
 	}
 
-	printf("*** (core unregister) cache refcnt before put: %d\n", ocf_cache_get_refcnt(cache));
 	ocf_mngt_cache_put(cache);
-	printf("*** (core unregister) cache refcnt after put: %d\n", ocf_cache_get_refcnt(cache));
+	vbdev_ocf_core_destroy(core_ctx);
 
-	if (ocf_cache_get_refcnt(cache) < 2) {
-		ocf_mngt_cache_lock(cache, _cache_stop_rpc_lock_cb, cb_arg);
+	if (ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
+		ocf_mngt_cache_lock(cache, _cache_stop_rpc_lock_cb, cache_stop_ctx);
 	}
 }
 
@@ -857,18 +855,17 @@ _cache_stop_rpc_core_visit(ocf_core_t core, void *cb_arg)
 	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
 	int rc = 0;
 
-	// async fuckup ?
-	cache_stop_ctx->core = core;
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': cache stop visit\n", ocf_core_get_name(core));
 
-	printf("*** (core unregister) cache refcnt before get: %d\n", ocf_cache_get_refcnt(cache));
+	core_ctx->mngt_ctx = cache_stop_ctx;
+
 	if ((rc = ocf_mngt_cache_get(cache))) {
 		SPDK_ERRLOG("OCF core '%s': failed to increment cache '%s' ref count: %s\n",
 			    ocf_core_get_name(core), ocf_cache_get_name(cache), spdk_strerror(-rc));
 		return rc;
 	}
-	printf("*** (core unregister) cache refcnt after get: %d\n", ocf_cache_get_refcnt(cache));
 
-	if ((rc = vbdev_ocf_core_unregister(core_ctx, _cache_stop_rpc_core_unregister_cb, cache_stop_ctx))) {
+	if ((rc = vbdev_ocf_core_unregister(core_ctx, _cache_stop_rpc_core_unregister_cb, core))) {
 		SPDK_ERRLOG("OCF core '%s': failed to start unregistering OCF vbdev during cache stop: %s\n",
 			    ocf_core_get_name(core), spdk_strerror(-rc));
 		return rc;
@@ -887,7 +884,6 @@ vbdev_ocf_cache_stop(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating stop\n", cache_name);
 
-	// increments cache refcnt !!!
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
@@ -910,7 +906,7 @@ vbdev_ocf_cache_stop(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 	cache_stop_ctx->rpc_cb_fn = rpc_cb_fn;
 	cache_stop_ctx->rpc_cb_arg = rpc_cb_arg;
 
-	if (ocf_cache_get_core_count(cache) > 0) {
+	if (ocf_cache_get_core_count(cache)) {
 		if ((rc = ocf_core_visit(cache, _cache_stop_rpc_core_visit, cache_stop_ctx, true))) {
 			SPDK_ERRLOG("OCF: failed to iterate over core bdevs: %s\n", spdk_strerror(-rc));
 			// ocf_mngt_cache_lock(...) ?
@@ -940,8 +936,11 @@ _cache_detach_rpc_detach_cb(ocf_cache_t cache, void *cb_arg, int error)
 			    ocf_cache_get_name(cache), error);
 	} else {
 		vbdev_ocf_cache_base_detach(cache);
-		SPDK_NOTICELOG("OCF cache '%s': detached\n", ocf_cache_get_name(cache));
+		SPDK_NOTICELOG("OCF cache '%s': device detached\n", ocf_cache_get_name(cache));
 	}
+
+	/* Increment queue refcount to prevent destroying management queue after cache device detach. */
+	ocf_queue_get(((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q);
 
 	ocf_mngt_cache_unlock(cache);
 	ocf_mngt_cache_put(cache);
@@ -972,6 +971,9 @@ _cache_detach_rpc_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *cache_detach_ctx = cb_arg;
 
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': detaching OCF cache device\n",
+		      ocf_cache_get_name(cache));
+
 	if (error) {
 		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
 			    ocf_cache_get_name(cache), error);
@@ -999,14 +1001,13 @@ vbdev_ocf_cache_detach(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, 
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating device detach\n", cache_name);
 
-	// increments cache refcnt !!!
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
 		goto err_cache;
 	}
 
-	if (ocf_cache_is_detached(cache)) {
+	if (!ocf_cache_is_device_attached(cache)) {
 		SPDK_ERRLOG("OCF cache '%s': device already detached\n", cache_name);
 		rc = -EALREADY; // better errno ?
 		goto err_state;
@@ -1017,7 +1018,7 @@ vbdev_ocf_cache_detach(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, 
 		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for cache detach context\n",
 			    cache_name);
 		rc = -ENOMEM;
-		goto err_state;
+		goto err_alloc;
 	}
 	cache_detach_ctx->rpc_cb_fn = rpc_cb_fn;
 	cache_detach_ctx->rpc_cb_arg = rpc_cb_arg;
@@ -1026,6 +1027,7 @@ vbdev_ocf_cache_detach(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, 
 
 	return;
 
+err_alloc:
 err_state:
 	ocf_mngt_cache_put(cache);
 err_cache:
@@ -1045,7 +1047,7 @@ _cache_attach_rpc_attach_cb(ocf_cache_t cache, void *cb_arg, int error)
 			    ocf_cache_get_name(cache), error);
 		vbdev_ocf_cache_base_detach(cache);
 	} else {
-		SPDK_NOTICELOG("OCF cache '%s': attached\n", ocf_cache_get_name(cache));
+		SPDK_NOTICELOG("OCF cache '%s': device attached\n", ocf_cache_get_name(cache));
 	}
 
 	ocf_mngt_cache_unlock(cache);
@@ -1059,6 +1061,9 @@ _cache_attach_rpc_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *cache_attach_ctx = cb_arg;
 	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': attaching OCF cache device\n",
+		      ocf_cache_get_name(cache));
 
 	if (error) {
 		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
@@ -1107,7 +1112,7 @@ vbdev_ocf_cache_attach(const char *cache_name, const char *base_name, bool force
 			return;
 		}
 		SPDK_ERRLOG("OCF cache '%s': failed to open base bdev '%s'\n", cache_name, base_name);
-		goto err_state;
+		goto err_base;
 	}
 
 	cache_attach_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
@@ -1129,6 +1134,7 @@ vbdev_ocf_cache_attach(const char *cache_name, const char *base_name, bool force
 
 err_alloc:
 	vbdev_ocf_cache_base_detach(cache);
+err_base:
 err_state:
 	ocf_mngt_cache_put(cache);
 err_cache:
@@ -1233,7 +1239,7 @@ vbdev_ocf_core_add(const char *core_name, const char *base_name, const char *cac
 	if (vbdev_ocf_bdev_exists(core_name)) {
 		SPDK_ERRLOG("OCF: bdev '%s' already exists\n", core_name);
 		rc = -EEXIST;
-		goto err_create;
+		goto err_exist;
 	}
 
 	if ((rc = vbdev_ocf_core_create(&core_ctx, core_name, cache_name))) {
@@ -1289,6 +1295,7 @@ err_alloc:
 err_base:
 	vbdev_ocf_core_destroy(core_ctx);
 err_create:
+err_exist:
 	rpc_cb_fn(core_name, rpc_cb_arg, rc);
 }
 
@@ -1371,6 +1378,8 @@ vbdev_ocf_core_remove(const char *core_name, const char *cache_name,
 	core_ctx = vbdev_ocf_core_waitlist_get_by_name(core_name);
 	if (core_ctx) {
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': removing from wait list\n", core_name);
+
+		STAILQ_REMOVE(&g_vbdev_ocf_core_waitlist, core_ctx, vbdev_ocf_core, waitlist_entry);
 		if (vbdev_ocf_core_is_base_attached(core_ctx)) {
 			vbdev_ocf_core_base_detach(core_ctx);
 		}
@@ -1397,7 +1406,7 @@ vbdev_ocf_core_remove(const char *core_name, const char *cache_name,
 	if (!core_rm_ctx) {
 		SPDK_ERRLOG("OCF core '%s': failed to allocate memory for core remove context\n", core_name);
 		rc = -ENOMEM;
-		goto err_core;
+		goto err_alloc;
 	}
 	core_rm_ctx->cache = cache;
 	core_rm_ctx->core = core;
@@ -1415,88 +1424,70 @@ vbdev_ocf_core_remove(const char *core_name, const char *cache_name,
 
 err_unregister:
 	free(core_rm_ctx);
+err_alloc:
 err_core:
 	ocf_mngt_cache_put(cache);
 err_cache:
 	rpc_cb_fn(core_name, rpc_cb_arg, rc);
 }
 
-//comp
-//static void
-//_write_cache_info_begin(struct spdk_json_write_ctx *w, struct vbdev_ocf_cache *cache)
-//{
-//	spdk_json_write_object_begin(w);
-//	spdk_json_write_named_string(w, "type", "OCF_cache");
-//	spdk_json_write_named_string(w, "name", cache->name);
-//	spdk_json_write_named_string(w, "base_bdev_name",
-//				     cache->base.bdev ? spdk_bdev_get_name(cache->base.bdev) : "" );
-//	spdk_json_write_named_uint16(w, "cores_count", cache->cores_count);
-//}
-//
-//static void
-//_write_cache_info_end(struct spdk_json_write_ctx *w, struct vbdev_ocf_cache *cache)
-//{
-//	spdk_json_write_object_end(w);
-//}
-//
-//static void
-//_write_core_info(struct spdk_json_write_ctx *w, struct vbdev_ocf_core *core)
-//{
-//	spdk_json_write_object_begin(w);
-//	spdk_json_write_named_string(w, "type", "OCF_core");
-//	spdk_json_write_named_string(w, "name", core->name);
-//	spdk_json_write_named_string(w, "base_bdev_name",
-//				     core->base.bdev ? spdk_bdev_get_name(core->base.bdev) : "" );
-//	spdk_json_write_named_string(w, "cache_name", vbdev_ocf_core_get_cache(core)->name);
-//	spdk_json_write_object_end(w);
-//}
+// handle errors ?
+static int
+_get_bdevs_core_visit(ocf_core_t core, void *cb_arg)
+{
+	struct spdk_json_write_ctx *w = cb_arg;
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_string(w, "type", "OCF_core");
+	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
+	spdk_json_write_named_bool(w, "base_attached", vbdev_ocf_core_is_base_attached(core_ctx));
+	spdk_json_write_named_string(w, "base_name", vbdev_ocf_core_is_base_attached(core_ctx) ?
+				     spdk_bdev_get_name(core_ctx->base.bdev) : "" );
+	spdk_json_write_object_end(w);
+
+	return 0;
+}
+
+static int
+_get_bdevs_cache_visit(ocf_cache_t cache, void *cb_arg)
+{
+	struct spdk_json_write_ctx *w = cb_arg;
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+	int rc;
+
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_string(w, "type", "OCF_cache");
+	spdk_json_write_named_string(w, "name", ocf_cache_get_name(cache));
+	spdk_json_write_named_bool(w, "base_attached", ocf_cache_is_device_attached(cache));
+	spdk_json_write_named_string(w, "base_name", ocf_cache_is_device_attached(cache) ?
+				     spdk_bdev_get_name(cache_ctx->base.bdev) : "" );
+	spdk_json_write_named_uint16(w, "cores_count", ocf_cache_get_core_count(cache));
+	spdk_json_write_named_array_begin(w, "cores");
+	if ((rc = ocf_core_visit(cache, _get_bdevs_core_visit, w, false))) {
+		return rc;
+	}
+	spdk_json_write_array_end(w);
+	spdk_json_write_object_end(w);
+
+	return 0;
+}
 
 /* RPC entry point. */
 void
 vbdev_ocf_get_bdevs(const char *name, vbdev_ocf_get_bdevs_cb rpc_cb_fn, void *rpc_cb_arg1, void *rpc_cb_arg2)
 {
-	//comp
-	//struct spdk_json_write_ctx *w = rpc_cb_arg1;
-	//struct vbdev_ocf_cache *cache;
-	//struct vbdev_ocf_core *core;
-	//bool found = false;
+	struct spdk_json_write_ctx *w = rpc_cb_arg1;
+	int rc;
 
-	//if (name) {
-	//	vbdev_ocf_foreach_cache(cache) {
-	//		vbdev_ocf_foreach_core_in_cache(core, cache) {
-	//			if (strcmp(name, core->name)) {
-	//				continue;
-	//			}
-	//			found = true;
+	// TODO: dump info about 'name' bdev only
+	// TODO: dump info about cores in wait list
 
-	//			// dump_info_json() instead?
-	//			_write_core_info(w, core);
-	//			break;
-	//		}
-	//		if (found) {
-	//			break;
-	//		}
-	//		if (strcmp(name, cache->name)) {
-	//			continue;
-	//		}
+	if ((rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _get_bdevs_cache_visit, w))) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+	}
 
-	//		_write_cache_info_begin(w, cache);
-	//		_write_cache_info_end(w, cache);
-	//		break;
-	//	}
-	//} else {
-	//	vbdev_ocf_foreach_cache(cache) {
-	//		_write_cache_info_begin(w, cache);
-	//		spdk_json_write_named_array_begin(w, "cores");
-	//		vbdev_ocf_foreach_core_in_cache(core, cache) {
-	//			_write_core_info(w, core);
-	//		}
-	//		spdk_json_write_array_end(w);
-	//		_write_cache_info_end(w, cache);
-	//	}
-	//}
-
-	//rpc_cb_fn(rpc_cb_arg1, rpc_cb_arg2);
+	rpc_cb_fn(rpc_cb_arg1, rpc_cb_arg2);
 }
 
 SPDK_LOG_REGISTER_COMPONENT(vbdev_ocf)

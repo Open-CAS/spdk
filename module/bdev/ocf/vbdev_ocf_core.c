@@ -167,7 +167,9 @@ _core_io_queue_stop(void *ctx)
 	struct vbdev_ocf_core_io_channel_ctx *ch_ctx = ctx;
 
 	spdk_poller_unregister(&ch_ctx->poller);
-	spdk_put_io_channel(ch_ctx->cache_ch);
+	if (ch_ctx->cache_ch) {
+		spdk_put_io_channel(ch_ctx->cache_ch);
+	}
 	spdk_put_io_channel(ch_ctx->core_ch);
 	free(ch_ctx);
 }
@@ -226,19 +228,21 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 		return -ENOMEM;
 	}
 
-	if ((rc = vbdev_ocf_queue_create(cache, &ch_ctx->queue, &core_io_queue_ops))) {
+	if ((rc = ocf_queue_create(cache, &ch_ctx->queue, &core_io_queue_ops))) {
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create OCF queue\n", vbdev_name);
 		free(ch_ctx);
 		return rc;
 	}
 	ocf_queue_set_priv(ch_ctx->queue, ch_ctx);
 
-	ch_ctx->cache_ch = spdk_bdev_get_io_channel(cache_base->desc);
-	if (!ch_ctx->cache_ch) {
-		SPDK_ERRLOG("OCF vbdev '%s': failed to create IO channel for base bdev '%s'\n",
-			    vbdev_name, spdk_bdev_get_name(cache_base->bdev));
-		vbdev_ocf_queue_put(ch_ctx->queue);
-		return -ENOMEM;
+	if (!ocf_cache_is_detached(cache)) {
+		ch_ctx->cache_ch = spdk_bdev_get_io_channel(cache_base->desc);
+		if (!ch_ctx->cache_ch) {
+			SPDK_ERRLOG("OCF vbdev '%s': failed to create IO channel for base bdev '%s'\n",
+				    vbdev_name, spdk_bdev_get_name(cache_base->bdev));
+			ocf_queue_put(ch_ctx->queue);
+			return -ENOMEM;
+		}
 	}
 
 	ch_ctx->core_ch = spdk_bdev_get_io_channel(core_base->desc);
@@ -246,7 +250,7 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create IO channel for base bdev '%s'\n",
 			    vbdev_name, spdk_bdev_get_name(core_base->bdev));
 		spdk_put_io_channel(ch_ctx->cache_ch);
-		vbdev_ocf_queue_put(ch_ctx->queue);
+		ocf_queue_put(ch_ctx->queue);
 		return -ENOMEM;
 	}
 
@@ -255,7 +259,7 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create IO queue poller\n", vbdev_name);
 		spdk_put_io_channel(ch_ctx->core_ch);
 		spdk_put_io_channel(ch_ctx->cache_ch);
-		vbdev_ocf_queue_put(ch_ctx->queue);
+		ocf_queue_put(ch_ctx->queue);
 		return -ENOMEM;
 	}
 
@@ -279,7 +283,7 @@ _vbdev_ocf_ch_destroy_cb(void *io_device, void *ctx_buf)
 		      spdk_bdev_get_name(&(((struct vbdev_ocf_core *)ocf_core_get_priv(
 				      (ocf_core_t)io_device))->ocf_vbdev)));
 
-	vbdev_ocf_queue_put(ch_destroy_ctx->queue);
+	ocf_queue_put(ch_destroy_ctx->queue);
 }
 
 int
@@ -343,6 +347,7 @@ vbdev_ocf_core_waitlist_get_by_name(const char *core_name)
 	struct vbdev_ocf_core *core_ctx;
 
 	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
+		// if (core_ctx && ...) ?
 		if (!strcmp(core_name, vbdev_ocf_core_get_name(core_ctx))) {
 			return core_ctx;
 		}

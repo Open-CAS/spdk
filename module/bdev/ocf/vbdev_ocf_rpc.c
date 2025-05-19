@@ -348,7 +348,7 @@ rpc_bdev_ocf_get_bdevs_cb(void *cb_arg1, void *cb_arg2)
 	struct spdk_json_write_ctx *w = cb_arg1;
 	struct spdk_jsonrpc_request *request = cb_arg2;
 
-	spdk_json_write_array_end(w);
+	spdk_json_write_object_end(w);
 	spdk_jsonrpc_end_result(request, w);
 }
 
@@ -368,7 +368,7 @@ rpc_bdev_ocf_get_bdevs(struct spdk_jsonrpc_request *request, const struct spdk_j
 	}
 
 	w = spdk_jsonrpc_begin_result(request);
-	spdk_json_write_array_begin(w);
+	spdk_json_write_object_begin(w);
 
 	vbdev_ocf_get_bdevs(params ? req.name : NULL, rpc_bdev_ocf_get_bdevs_cb, w, request);
 

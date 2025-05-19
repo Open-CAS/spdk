@@ -17,7 +17,7 @@ struct vbdev_ocf_cache {
 	struct ocf_mngt_cache_config		cache_cfg;
 	struct ocf_mngt_cache_attach_config	cache_att_cfg;
 	ocf_queue_t				cache_mngt_q;
-	bool					load;
+	bool					no_load;
 
 	struct vbdev_ocf_base			base;
 };
@@ -34,6 +34,8 @@ int vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char 
 void vbdev_ocf_cache_destroy(ocf_cache_t cache);
 int vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name);
 void vbdev_ocf_cache_base_detach(ocf_cache_t cache);
+int vbdev_ocf_cache_config_volume_create(ocf_cache_t cache);
+void vbdev_ocf_cache_config_volume_destroy(ocf_cache_t cache);
 int vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache);
 
 bool vbdev_ocf_cache_is_base_attached(ocf_cache_t cache);

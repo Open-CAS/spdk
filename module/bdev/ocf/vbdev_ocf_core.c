@@ -17,6 +17,7 @@ vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name, const 
 {
 	struct vbdev_ocf_core *core_ctx;
 	struct ocf_mngt_core_config *core_cfg;
+	int rc = 0;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': allocating structs\n",
 		      core_name);
@@ -30,12 +31,19 @@ vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name, const 
 
 	core_cfg = &core_ctx->core_cfg;
 	ocf_mngt_core_config_set_default(core_cfg);
+
 	strncpy(core_cfg->name, core_name, OCF_CORE_NAME_SIZE);
 	strncpy(core_ctx->cache_name, cache_name, OCF_CACHE_NAME_SIZE);
 
+	if ((rc = ocf_uuid_set_str(&core_cfg->uuid, core_cfg->name))) {
+		SPDK_ERRLOG("OCF core '%s': failed to set OCF volume uuid\n", core_name);
+		free(core_ctx);
+		return rc;
+	}
+
 	*out = core_ctx;
 
-	return 0;
+	return rc;
 }
 
 void
@@ -104,6 +112,8 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': attaching base bdev '%s'\n",
 		      vbdev_ocf_core_get_name(core_ctx), base_name);
 
+	strncpy(base->name, base_name, OCF_CORE_NAME_SIZE);
+
 	if ((rc = spdk_bdev_open_ext(base_name, true, _vbdev_ocf_core_event_cb, core_ctx, &base->desc))) {
 		return rc;
 	}
@@ -128,16 +138,6 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	base->thread = spdk_get_thread();
 	base->is_cache = false;
 	base->attached = true;
-
-	// alloc uuid ?
-	if ((rc = ocf_uuid_set_str(&core_cfg->uuid, (char *)base_name))) {
-		SPDK_ERRLOG("OCF core '%s': failed to set OCF volume uuid\n",
-			    vbdev_ocf_core_get_name(core_ctx));
-		spdk_put_io_channel(base->mngt_ch);
-		spdk_bdev_close(base->desc);
-		return rc;
-	}
-
 	core_cfg->volume_type = SPDK_OBJECT;
 	// for ocf_volume_open() in ocf_mngt_cache_add_core()
 	core_cfg->volume_params = base;
@@ -155,8 +155,6 @@ vbdev_ocf_core_base_detach(struct vbdev_ocf_core *core_ctx)
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': detaching base bdev '%s'\n",
 		      vbdev_ocf_core_get_name(core_ctx), spdk_bdev_get_name(base->bdev));
-
-	// dealloc uuid ?
 
 	vbdev_ocf_base_detach(base);
 }
@@ -312,7 +310,7 @@ vbdev_ocf_core_register(ocf_core_t core)
 
 	spdk_io_device_register(core, _vbdev_ocf_ch_create_cb, _vbdev_ocf_ch_destroy_cb,
 				sizeof(struct vbdev_ocf_core_io_channel_ctx), ocf_core_get_name(core));
-	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': io_device created at 0x%p\n",
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': io_device created at %p\n",
 		      spdk_bdev_get_name(ocf_vbdev), core);
 
 	if ((rc = spdk_bdev_register(ocf_vbdev))) { // needs to be called from SPDK app thread

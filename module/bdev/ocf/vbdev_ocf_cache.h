@@ -22,6 +22,17 @@ struct vbdev_ocf_cache {
 	struct vbdev_ocf_base			base;
 };
 
+typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
+
+struct vbdev_ocf_mngt_ctx {
+	ocf_cache_t			cache;
+	ocf_core_t			core;
+	struct vbdev_ocf_core *		core_ctx;
+	ocf_mngt_cache_attach_end_t	att_cb_fn;
+	vbdev_ocf_rpc_mngt_cb		rpc_cb_fn;
+	void *				rpc_cb_arg;
+};
+
 struct vbdev_ocf_cache_mngt_queue_ctx {
 	struct spdk_poller *		poller;
 	struct spdk_thread *		thread;
@@ -36,6 +47,7 @@ int vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name);
 void vbdev_ocf_cache_base_detach(ocf_cache_t cache);
 int vbdev_ocf_cache_config_volume_create(ocf_cache_t cache);
 void vbdev_ocf_cache_config_volume_destroy(ocf_cache_t cache);
+int vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *ctx);
 int vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache);
 
 bool vbdev_ocf_cache_is_base_attached(ocf_cache_t cache);

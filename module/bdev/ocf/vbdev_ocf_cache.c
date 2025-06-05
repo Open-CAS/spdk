@@ -47,15 +47,6 @@ vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cac
 		return rc;
 	}
 
-	// needed ?
-	//if ((rc = ocf_mngt_cache_get(cache))) {
-	//	SPDK_ERRLOG("OCF cache '%s': failed to increment cache ref count: %s\n",
-	//		    cache_name, spdk_strerror(-rc));
-	//	ocf_mngt_cache_stop(cache, NULL, NULL); // needs callback (_cache_start_err_cb ?)
-	//	free(cache_ctx);
-	//	return rc;
-	//}
-
 	*out = cache;
 
 	return rc;
@@ -233,6 +224,56 @@ vbdev_ocf_cache_config_volume_destroy(ocf_cache_t cache)
 	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 
 	ocf_volume_destroy(cache_ctx->cache_att_cfg.device.volume);
+}
+
+static void
+_volume_attach_metadata_probe_cb(void *priv, int error, struct ocf_metadata_probe_status *status)
+{
+	struct vbdev_ocf_mngt_ctx *ctx = priv;
+	ocf_cache_t cache = ctx->cache;
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	ocf_volume_close(cache_ctx->cache_att_cfg.device.volume);
+
+	if (error && error != -OCF_ERR_NO_METADATA) {
+		SPDK_ERRLOG("OCF cache '%s': failed to probe metadata\n", ocf_cache_get_name(cache));
+		ctx->att_cb_fn(cache, ctx, error);
+	}
+
+	if (error == -OCF_ERR_NO_METADATA) {
+		SPDK_NOTICELOG("OCF cache '%s': metadata not found - starting new cache instance\n",
+			       ocf_cache_get_name(cache));
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+	} else {
+		SPDK_NOTICELOG("OCF cache '%s': metadata found - loading previous cache instance\n",
+			       ocf_cache_get_name(cache));
+		SPDK_NOTICELOG("(start cache with 'no-load' flag to create new cache instead of loading config from metadata)\n");
+		// check status for cache_name/mode/line_size/dirty ?
+		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+	}
+}
+
+int
+vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *ctx)
+{
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+	int rc;
+
+	if (cache_ctx->no_load) {
+		SPDK_NOTICELOG("'no-load' flag specified - starting new cache without looking for metadata\n");
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+		return 0;
+	}
+
+	if ((rc = ocf_volume_open(cache_ctx->cache_att_cfg.device.volume, &cache_ctx->base))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to open volume\n", ocf_cache_get_name(cache));
+		return rc;
+	}
+
+	ocf_metadata_probe(vbdev_ocf_ctx, cache_ctx->cache_att_cfg.device.volume,
+			   _volume_attach_metadata_probe_cb, ctx);
+
+	return 0;
 }
 
 static void

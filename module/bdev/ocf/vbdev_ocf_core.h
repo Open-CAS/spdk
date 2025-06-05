@@ -56,5 +56,6 @@ int vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregis
 char *vbdev_ocf_core_get_name(struct vbdev_ocf_core *core_ctx);
 struct vbdev_ocf_core *vbdev_ocf_core_waitlist_get_by_name(const char *core_name);
 bool vbdev_ocf_core_is_base_attached(struct vbdev_ocf_core *core_ctx);
+bool vbdev_ocf_core_is_loaded(const char *core_name);
 
 #endif

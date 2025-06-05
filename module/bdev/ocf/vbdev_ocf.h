@@ -12,15 +12,6 @@
 typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
 typedef void (*vbdev_ocf_get_bdevs_cb)(void *cb_arg1, void *cb_arg2);
 
-struct vbdev_ocf_mngt_ctx {
-	ocf_cache_t			cache;
-	ocf_core_t			core;
-	struct vbdev_ocf_core *		core_ctx;
-	ocf_mngt_cache_attach_end_t	attach_cb_fn;
-	vbdev_ocf_rpc_mngt_cb		rpc_cb_fn;
-	void *				rpc_cb_arg;
-};
-
 /* RPC entry points. */
 
 void vbdev_ocf_cache_start(const char *cache_name,

@@ -359,3 +359,42 @@ vbdev_ocf_core_is_base_attached(struct vbdev_ocf_core *core_ctx)
 {
 	return core_ctx->base.attached;
 }
+
+static int
+_core_is_loaded_core_visit(ocf_core_t core, void *cb_arg)
+{
+	const char *core_name = cb_arg;
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+
+	if (!strcmp(core_name, ocf_core_get_name(core)) && !core_ctx) {
+		/* Core context is assigned only after manual core add (either right away
+		 * if all devices are present, after corresponding cache start, or base bdev
+		 * appearance).
+		 * If there is no context, it means that this core was added from metadata
+		 * during cache load. */
+		return -EEXIST;
+	}
+
+	return 0;
+}
+
+static int
+_core_is_loaded_cache_visit(ocf_cache_t cache, void *cb_arg)
+{
+	return ocf_core_visit(cache, _core_is_loaded_core_visit, cb_arg, false);
+}
+
+bool
+vbdev_ocf_core_is_loaded(const char *core_name)
+{
+	int rc;
+
+	rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _core_is_loaded_cache_visit, (char *)core_name);
+	if (rc == -EEXIST) {
+		return true;
+	} else if (rc) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+	}
+
+	return false;
+}

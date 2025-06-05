@@ -23,9 +23,11 @@ vbdev_ocf_volume_open(ocf_volume_t volume, void *opts)
 
 	// refactor (like ocf_core_volume in ocf_core.c ?)
 
-	assert(opts);
+	if (opts) {
+		*priv = opts;
+	}
 
-	*priv = opts;
+	assert(*priv);
 
 	return 0;
 }

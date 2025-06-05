@@ -8,7 +8,7 @@
 
 #include "spdk/stdinc.h"
 
-#define OCF_VERSION_MAIN 20
+#define OCF_VERSION_MAIN 25
 #define OCF_VERSION_MAJOR 3
 #define OCF_VERSION_MINOR 0
 

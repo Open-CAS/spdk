@@ -333,6 +333,97 @@ vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregister_
 					    &ocf_if, cb_fn, cb_arg);
 }
 
+static void
+_core_add_from_waitlist_err_cb(void *cb_arg, int error)
+{
+	ocf_cache_t cache = cb_arg;
+
+	if (error) {
+		SPDK_ERRLOG("OCF core: failed to remove OCF core device (OCF error: %d)\n", error);
+	}
+
+	ocf_mngt_cache_unlock(cache);
+}
+
+static void
+_core_add_from_waitlist_add_cb(ocf_cache_t cache, ocf_core_t core, void *cb_arg, int error)
+{
+	struct vbdev_ocf_core *core_ctx = cb_arg;
+	int rc = 0;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing add of OCF core\n",
+		      vbdev_ocf_core_get_name(core_ctx));
+
+	if (error) {
+		SPDK_ERRLOG("OCF core '%s': failed to add core to OCF cache '%s' (OCF error: %d)\n",
+			    vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache), error);
+		ocf_mngt_cache_unlock(cache);
+		return;
+	}
+
+	ocf_core_set_priv(core, core_ctx);
+
+	if ((rc = vbdev_ocf_core_register(core))) {
+		SPDK_ERRLOG("OCF core '%s': failed to register vbdev: %s\n",
+			    ocf_core_get_name(core), spdk_strerror(-rc));
+		ocf_mngt_cache_remove_core(core, _core_add_from_waitlist_err_cb, cache);
+		return;
+	}
+
+	SPDK_NOTICELOG("OCF core '%s': added to cache '%s'\n",
+		       ocf_core_get_name(core), ocf_cache_get_name(cache));
+
+	ocf_mngt_cache_unlock(cache);
+	STAILQ_REMOVE(&g_vbdev_ocf_core_waitlist, core_ctx, vbdev_ocf_core, waitlist_entry);
+}
+
+static void
+_core_add_from_waitlist_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_core *core_ctx = cb_arg;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating add of OCF core\n",
+		      vbdev_ocf_core_get_name(core_ctx));
+
+	if (error) {
+		SPDK_ERRLOG("OCF core '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    vbdev_ocf_core_get_name(core_ctx), error);
+		return;
+	}
+
+	ocf_mngt_cache_add_core(cache, &core_ctx->core_cfg, _core_add_from_waitlist_add_cb, core_ctx);
+}
+
+void
+vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
+{
+	struct vbdev_ocf_core *core_ctx;
+	uint32_t cache_block_size = ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->base.bdev->blocklen;
+	uint32_t core_block_size;
+
+	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
+		if (strcmp(ocf_cache_get_name(cache), core_ctx->cache_name) ||
+				!vbdev_ocf_core_is_base_attached(core_ctx)) {
+			continue;
+		}
+
+		SPDK_NOTICELOG("OCF core '%s': adding from waitlist to cache '%s'\n",
+			       vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache));
+
+		core_block_size = core_ctx->base.bdev->blocklen;
+		if (cache_block_size > core_block_size) {
+			SPDK_ERRLOG("OCF core '%s': failed to add to cache '%s': cache block size (%d) is greater than core block size (%d)\n",
+				    vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache),
+				    cache_block_size, core_block_size);
+			continue;
+		}
+
+		core_ctx->core_cfg.try_add = vbdev_ocf_core_is_loaded(vbdev_ocf_core_get_name(core_ctx));
+
+		ocf_mngt_cache_lock(cache, _core_add_from_waitlist_lock_cb, core_ctx);
+	}
+}
+
 char *
 vbdev_ocf_core_get_name(struct vbdev_ocf_core *core_ctx)
 {

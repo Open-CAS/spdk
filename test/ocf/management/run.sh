@@ -2,14 +2,15 @@
 
 #
 #  SPDX-License-Identifier: BSD-3-Clause
-#  Copyright (C) 2018 Intel Corporation
 #  Copyright (C) 2025 Huawei Technologies
 #  All rights reserved.
 #
 
 curdir=$(dirname $(readlink -f "${BASH_SOURCE[0]}"))
-rootdir=$(readlink -f $curdir/../..)
+rootdir=$(readlink -f $curdir/../../..)
 
 source $rootdir/test/common/autotest_common.sh
 
-run_test "ocf_management" "$curdir/management/run.sh"
+run_test "start-stop" "$curdir/start-stop/run.sh"
+run_test "detach-attach" "$curdir/detach-attach.sh"
+run_test "hotremove" "$curdir/hotremove.sh"

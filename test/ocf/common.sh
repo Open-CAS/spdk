@@ -151,22 +151,26 @@ __check_caches_detached() {
 
 __check_cores_empty() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 0'
+	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 0'
 }
 
 __check_cores_attached() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 3'
+	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 3'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].base_attached'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].loading | not'
 }
 
 __check_cores_detached() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 3'
+	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 3'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].base_attached | not'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].loading | not'
 }
 
 __check_cores_loading() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 3'
+	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 3'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].base_attached | not'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[].loading'
 }

@@ -12,4 +12,4 @@ rootdir=$(readlink -f $curdir/../..)
 
 source $rootdir/test/common/autotest_common.sh
 
-run_test "ocf_management" "$curdir/management/run.sh"
+run_test "management" "$curdir/management/run.sh"

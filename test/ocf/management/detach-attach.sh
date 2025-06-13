@@ -12,358 +12,169 @@ source "$rootdir/test/ocf/common.sh"
 
 # caches only:
 
-start_spdk
-create_caches
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-stop_spdk
-
-start_spdk
-create_caches
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-stop_caches
-__check_caches_empty
-stop_spdk
-
-start_spdk
-create_caches
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-attach_caches
-__check_caches_attached
-stop_spdk
-
-start_spdk
-create_caches
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-attach_caches
-__check_caches_attached
-stop_caches
-__check_caches_empty
-stop_spdk
+for attach_caches in false true; do
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	start_caches
+	__check_caches_attached
+	detach_caches
+	__check_caches_detached
+	if [ $attach_caches = true ]; then
+		attach_caches
+		__check_caches_attached
+	fi
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done
+done
 
 # add cores before detaching caches:
 
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-stop_caches
-__check_caches_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-stop_caches
-__check_caches_empty
-stop_spdk
+for attach_caches in false true; do
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	create_cores
+	start_caches
+	add_cores
+	__check_caches_attached
+	__check_cores_attached
+	detach_caches
+	__check_caches_detached
+	__check_cores_attached
+	if [ $attach_caches = true ]; then
+		attach_caches
+		__check_caches_attached
+		__check_cores_attached
+	fi
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done
+done
 
 # add cores after detaching caches:
 
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-stop_caches
-__check_caches_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-__check_cores_waitlist_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-__check_cores_waitlist_empty
-stop_caches
-__check_caches_empty
-stop_spdk
+for attach_caches in false true; do
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	create_cores
+	start_caches
+	__check_caches_attached
+	detach_caches
+	__check_caches_detached
+	add_cores
+	__check_caches_detached
+	__check_cores_waitlist_attached
+	if [ $attach_caches = true ]; then
+		attach_caches
+		__check_caches_attached
+		__check_cores_attached
+		__check_cores_waitlist_empty
+	fi
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done
+done
 
 # add cores before and remove after detaching caches:
 
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-stop_spdk
+for attach_caches in false true; do
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	create_cores
+	start_caches
+	add_cores
+	__check_caches_attached
+	__check_cores_attached
+	detach_caches
+	__check_caches_detached
+	__check_cores_attached
+	remove_cores
+	__check_caches_detached
+	__check_cores_empty
+	if [ $attach_caches = true ]; then
+		attach_caches
+		__check_caches_attached
+		__check_cores_empty
+	fi
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done
+done
 
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-stop_caches
-__check_caches_empty
-stop_spdk
+# add cores after detaching caches and remove before/without attaching:
 
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-attach_caches
-__check_caches_attached
-__check_cores_empty
-stop_spdk
+for attach_caches in false true; do
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	create_cores
+	start_caches
+	__check_caches_attached
+	detach_caches
+	__check_caches_detached
+	add_cores
+	__check_caches_detached
+	__check_cores_empty
+	__check_cores_waitlist_attached
+	remove_cores
+	__check_caches_detached
+	__check_cores_empty
+	__check_cores_waitlist_empty
+	if [ $attach_caches = true ]; then
+		attach_caches
+		__check_caches_attached
+		__check_cores_empty
+		__check_cores_waitlist_empty
+	fi
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done
+done
 
-start_spdk
-create_caches
-create_cores
-start_caches
-add_cores
-__check_caches_attached
-__check_cores_attached
-detach_caches
-__check_caches_detached
-__check_cores_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-attach_caches
-__check_caches_attached
-__check_cores_empty
-stop_caches
-__check_caches_empty
-stop_spdk
+# add cores after detaching caches and remove after attaching:
 
-# add cores after detaching caches and remove (before/after/without) attaching:
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_attached
-remove_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_caches
-__check_caches_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-remove_cores
-__check_caches_detached
-__check_cores_waitlist_empty
-attach_caches
-__check_caches_attached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_waitlist_attached
-remove_cores
-__check_caches_detached
-__check_cores_waitlist_empty
-attach_caches
-__check_caches_attached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_caches
-__check_caches_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-__check_cores_waitlist_empty
-remove_cores
-__check_caches_attached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_spdk
-
-start_spdk
-create_caches
-create_cores
-start_caches
-__check_caches_attached
-detach_caches
-__check_caches_detached
-add_cores
-__check_caches_detached
-__check_cores_empty
-__check_cores_waitlist_attached
-attach_caches
-__check_caches_attached
-__check_cores_attached
-__check_cores_waitlist_empty
-remove_cores
-__check_caches_attached
-__check_cores_empty
-__check_cores_waitlist_empty
-stop_caches
-__check_caches_empty
-stop_spdk
+for stop_caches in false true; do
+	start_spdk
+	create_caches
+	create_cores
+	start_caches
+	__check_caches_attached
+	detach_caches
+	__check_caches_detached
+	add_cores
+	__check_caches_detached
+	__check_cores_empty
+	__check_cores_waitlist_attached
+	attach_caches
+	__check_caches_attached
+	__check_cores_attached
+	__check_cores_waitlist_empty
+	remove_cores
+	__check_caches_attached
+	__check_cores_empty
+	__check_cores_waitlist_empty
+	if [ $stop_caches = true ]; then
+		stop_caches
+		__check_caches_empty
+	fi
+	stop_spdk
+done

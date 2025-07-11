@@ -189,6 +189,15 @@ __check_cores_waitlist_detached() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[].base_attached | not'
 }
 
+# Generate random number between range.
+random_number() {
+	# $1: lower range (inclusive)
+	# $2: upper range (inclusive)
+	# stdout: random number between range
+
+	echo $(($1 + $RANDOM % ($2-$1+1)))
+}
+
 # Convert an array of items to comma separated list of items.
 array_to_comma_list() {
 	# $1: name of array variable

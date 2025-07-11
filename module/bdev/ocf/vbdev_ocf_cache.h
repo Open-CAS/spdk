@@ -25,18 +25,48 @@ struct vbdev_ocf_cache {
 	ocf_queue_t				cache_mngt_q;
 	/* Indicator for cache start to ignore cache metadata found on device. */
 	bool					no_load;
+	/* Status of cache flush operation. */
+	struct {
+		bool in_progress;
+		int error;
+	} flush;
 };
 
 typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
 
 /* Temporary context for management operations. */
 struct vbdev_ocf_mngt_ctx {
-	ocf_cache_t			cache;
-	ocf_core_t			core;
-	struct vbdev_ocf_core *		core_ctx;
-	ocf_mngt_cache_attach_end_t	att_cb_fn;
 	vbdev_ocf_rpc_mngt_cb		rpc_cb_fn;
 	void *				rpc_cb_arg;
+	const char *			bdev_name;
+	ocf_cache_t			cache;
+	ocf_core_t			core;
+	union {
+		ocf_mngt_cache_attach_end_t	att_cb_fn;
+		struct vbdev_ocf_core *		core_ctx;
+		ocf_cache_mode_t		cache_mode;
+		struct {
+			ocf_promotion_t		policy;
+			int32_t			nhit_insertion_threshold;
+			int32_t			nhit_trigger_threshold;
+		} promotion;
+		struct {
+			ocf_cleaning_t		policy;
+			int32_t			acp_wake_up_time;
+			int32_t			acp_flush_max_buffers;
+			int32_t			alru_wake_up_time;
+			int32_t			alru_flush_max_buffers;
+			int32_t			alru_staleness_time;
+			int32_t			alru_activity_threshold;
+			int32_t			alru_max_dirty_ratio;
+		} cleaning;
+		struct {
+			ocf_seq_cutoff_policy	policy;
+			int32_t			threshold;
+			int32_t			promotion_count;
+			int32_t			promote_on_threshold;
+		} seqcutoff;
+	} u;
 };
 
 /* Cache management queue context. */

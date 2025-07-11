@@ -34,7 +34,7 @@ vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cac
 	strncpy(cache_cfg->name, cache_name, OCF_CACHE_NAME_SIZE);
 
 	if (cache_mode) {
-		cache_cfg->cache_mode = ocf_get_cache_mode(cache_mode);
+		cache_cfg->cache_mode = vbdev_ocf_cachemode_get_by_name(cache_mode);
 	}
 	if (cache_line_size) {
 		cache_cfg->cache_line_size = cache_line_size * KiB;
@@ -237,19 +237,19 @@ _volume_attach_metadata_probe_cb(void *priv, int error, struct ocf_metadata_prob
 
 	if (error && error != -OCF_ERR_NO_METADATA) {
 		SPDK_ERRLOG("OCF cache '%s': failed to probe metadata\n", ocf_cache_get_name(cache));
-		ctx->att_cb_fn(cache, ctx, error);
+		ctx->u.att_cb_fn(cache, ctx, error);
 	}
 
 	if (error == -OCF_ERR_NO_METADATA) {
 		SPDK_NOTICELOG("OCF cache '%s': metadata not found - starting new cache instance\n",
 			       ocf_cache_get_name(cache));
-		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
 	} else {
 		SPDK_NOTICELOG("OCF cache '%s': metadata found - loading previous cache instance\n",
 			       ocf_cache_get_name(cache));
 		SPDK_NOTICELOG("(start cache with 'no-load' flag to create new cache instead of loading config from metadata)\n");
 		// check status for cache_name/mode/line_size/dirty ?
-		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
 	}
 }
 
@@ -261,7 +261,7 @@ vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *ctx)
 
 	if (cache_ctx->no_load) {
 		SPDK_NOTICELOG("'no-load' flag specified - starting new cache without looking for metadata\n");
-		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->att_cb_fn, ctx);
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
 		return 0;
 	}
 

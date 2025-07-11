@@ -9,12 +9,28 @@
 
 #include <ocf/ocf.h>
 
-ocf_cache_mode_t ocf_get_cache_mode(const char *cache_mode);
-const char *ocf_get_cache_modename(ocf_cache_mode_t mode);
+/* Get OCF cache mode by its name. */
+ocf_cache_mode_t vbdev_ocf_cachemode_get_by_name(const char *cache_mode_name);
 
-/* Get cache line size in KiB units */
-int ocf_get_cache_line_size(ocf_cache_t cache);
+/* Get the name of OCF cache mode. */
+const char *vbdev_ocf_cachemode_get_name(ocf_cache_mode_t cache_mode);
 
-/* Get sequential cutoff policy by name */
-ocf_seq_cutoff_policy ocf_get_seqcutoff_policy(const char *policy_name);
+/* Get OCF promotion policy by its name. */
+ocf_promotion_t vbdev_ocf_promotion_policy_get_by_name(const char *policy_name);
+
+/* Get the name of OCF promotion policy. */
+const char *vbdev_ocf_promotion_policy_get_name(ocf_promotion_t policy);
+
+/* Get OCF cleaning policy by its name. */
+ocf_cleaning_t vbdev_ocf_cleaning_policy_get_by_name(const char *policy_name);
+
+/* Get the name of OCF cleaning policy. */
+const char *vbdev_ocf_cleaning_policy_get_name(ocf_cleaning_t policy);
+
+/* Get OCF sequential cut-off policy by its name. */
+ocf_seq_cutoff_policy vbdev_ocf_seqcutoff_policy_get_by_name(const char *policy_name);
+
+/* Get the name of OCF sequential cut-off policy. */
+const char *vbdev_ocf_seqcutoff_policy_get_name(ocf_seq_cutoff_policy policy);
+
 #endif

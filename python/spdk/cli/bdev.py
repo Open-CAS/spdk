@@ -117,7 +117,7 @@ def add_parser(subparsers):
                    help='choose between {wt|wb|wa|wo|wi|pt}; default wt (Write-Through)',
                    choices=['wt', 'wb', 'wa', 'wo', 'wi', 'pt'])
     p.add_argument('-l', '--cache-line-size',
-                   help='choose between {4|8|16|32|64}; default 4 [KiB]',
+                   help='choose between {4|8|16|32|64} [KiB]; default 4',
                    type=int,
                    choices=[4, 8, 16, 32, 64])
     p.add_argument('-n', '--no-load', action='store_true', help='do not load previous cache instance from metadata and force starting a new one instead (WARNING: all cache metadata will be discarded!)')
@@ -164,12 +164,6 @@ def add_parser(subparsers):
     p.add_argument('cache_name', help='name of the cache vbdev to remove core from')
     p.set_defaults(func=bdev_ocf_remove_core)
 
-    def bdev_ocf_get_bdevs(args):
-        print_dict(args.client.bdev_ocf_get_bdevs(name=args.name))
-    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get info about OCF devices')
-    p.add_argument('name', nargs='?', help='optional name of specific OCF vbdev; shows all by default')
-    p.set_defaults(func=bdev_ocf_get_bdevs)
-
     def bdev_ocf_set_cachemode(args):
         args.client.bdev_ocf_set_cachemode(
                                         cache_name=args.cache_name,
@@ -181,71 +175,108 @@ def add_parser(subparsers):
                    choices=['wt', 'wb', 'wa', 'wo', 'wi', 'pt'])
     p.set_defaults(func=bdev_ocf_set_cachemode)
 
+    def bdev_ocf_set_promotion(args):
+        args.client.bdev_ocf_set_promotion(
+                                        cache_name=args.cache_name,
+                                        policy=args.policy,
+                                        nhit_insertion_threshold=args.nhit_insertion_threshold,
+                                        nhit_trigger_threshold=args.nhit_trigger_threshold)
+    p = subparsers.add_parser('bdev_ocf_set_promotion', help='Set promotion parameters for OCF cache device')
+    p.add_argument('cache_name', help='name of the cache vbdev')
+    p.add_argument('-p', '--policy',
+                   help='promotion policy (choose between {always|nhit})',
+                   choices=['always', 'nhit'],
+                   default='none')
+    p.add_argument('-i', '--nhit-insertion-threshold',
+                   help='number of requests for given core line after which NHIT policy allows insertion into cache (range <2-1000>; default 3)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-t', '--nhit-trigger-threshold',
+                   help='cache occupancy value over which NHIT promotion is active (range <0-100> [%]; default 80)',
+                   type=int,
+                   default=-1)
+    p.set_defaults(func=bdev_ocf_set_promotion)
+
     def bdev_ocf_set_cleaning(args):
         args.client.bdev_ocf_set_cleaning(
                                        cache_name=args.cache_name,
                                        policy=args.policy,
-                                       acp_wake_up=args.acp_wake_up,
+                                       acp_wake_up_time=args.acp_wake_up_time,
                                        acp_flush_max_buffers=args.acp_flush_max_buffers,
-                                       alru_wake_up=args.alru_wake_up,
+                                       alru_wake_up_time=args.alru_wake_up_time,
                                        alru_flush_max_buffers=args.alru_flush_max_buffers,
                                        alru_staleness_time=args.alru_staleness_time,
-                                       alru_activity_threshold=args.alru_activity_threshold)
+                                       alru_activity_threshold=args.alru_activity_threshold,
+                                       alru_max_dirty_ratio=args.alru_max_dirty_ratio)
     p = subparsers.add_parser('bdev_ocf_set_cleaning', help='Set cleaning parameters for OCF cache device')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
-                   help='cleaning policy; choose between {acp|alru|nop}',
-                   choices=['acp', 'alru', 'nop'])
-    p.add_argument('-u', '--acp-wake-up',
-                   help='time between ACP cleaning thread iterations: <0-10000> [ms]; default 10',
-                   type=int)
+                   help='cleaning policy (choose between {acp|alru|nop})',
+                   choices=['acp', 'alru', 'nop'],
+                   default='none')
+    p.add_argument('-u', '--acp-wake-up-time',
+                   help='time between ACP cleaning thread iterations (range <0-10000> [ms]; default 10)',
+                   type=int,
+                   default=-1)
     p.add_argument('-m', '--acp-flush-max-buffers',
-                   help='number of dirty cache lines to be flushed in a single ACP cleaning thread iteration: <1-10000>; default 128',
-                   type=int)
-    p.add_argument('-v', '--alru-wake-up',
-                   help='cleaning thread sleep time after an idle wake up: <0-3600> [s]; default 20',
-                   type=int)
+                   help='number of dirty cache lines to be flushed in a single ACP cleaning thread iteration (range <1-10000>; default 128)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-v', '--alru-wake-up-time',
+                   help='cleaning thread sleep time after an idle wake up (range <0-3600> [s]; default 20)',
+                   type=int,
+                   default=-1)
     p.add_argument('-n', '--alru-flush-max-buffers',
-                   help='number of dirty cache lines to be flushed in one cleaning cycle: <1-10000>; default 100',
-                   type=int)
+                   help='number of dirty cache lines to be flushed in one cleaning cycle (range <1-10000>; default 100)',
+                   type=int,
+                   default=-1)
     p.add_argument('-s', '--alru-staleness-time',
-                   help='time that has to pass from the last write operation before a dirty cache line can be scheduled to be flushed: <1-3600> [s]; default 120',
-                   type=int)
+                   help='time that has to pass from the last write operation before a dirty cache line can be scheduled to be flushed (range <1-3600> [s]; default 120)',
+                   type=int,
+                   default=-1)
     p.add_argument('-t', '--alru-activity-threshold',
-                   help='cache idle time before flushing thread can start <0-1000000> [ms]; default 10000',
-                   type=int)
+                   help='cache idle time before flushing thread can start (range <0-1000000> [ms]; default 10000)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-d', '--alru-max-dirty-ratio',
+                   help='maximum percentage of cache occupancy at which cleaning is triggered immediately (range <0-100> [%]; default 100)',
+                   type=int,
+                   default=-1)
     p.set_defaults(func=bdev_ocf_set_cleaning)
 
     def bdev_ocf_set_seqcutoff(args):
         args.client.bdev_ocf_set_seqcutoff(
-                                        core_name=args.core_name,
+                                        bdev_name=args.bdev_name,
                                         policy=args.policy,
                                         threshold=args.threshold,
-                                        promotion_count=args.promotion_count)
-    p = subparsers.add_parser('bdev_ocf_set_seqcutoff', help='Set sequential cut-off parameters for OCF core device')
-    p.add_argument('core_name', help='name of the core vbdev')
+                                        promotion_count=args.promotion_count,
+                                        promote_on_threshold=args.promote_on_threshold)
+    p = subparsers.add_parser('bdev_ocf_set_seqcutoff', help='Set sequential cut-off parameters for OCF core device or all cores in given cache')
+    p.add_argument('bdev_name', help='name of OCF vbdev')
     p.add_argument('-p', '--policy',
-                   help='sequential cut-off policy; choose between {always|full|never}',
-                   choices=['always', 'full', 'never'])
+                   help='sequential cut-off policy (choose between {always|full|never})',
+                   choices=['always', 'full', 'never'],
+                   default='none')
     p.add_argument('-t', '--threshold',
-                   help='activation threshold [KiB]',
-                   type=int)
-    p.add_argument('-c', '--promotion_count',
-                   help='request count threshold for cutting off the sequential stream',
-                   type=int)
+                   help='activation threshold (range <1-4194181> [KiB]; default 1)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-c', '--promotion-count',
+                   help='request count threshold for cutting off the sequential stream (range <1-65535>; default 8)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-o', '--promote-on-threshold',
+                   help='whether to promote core sequential cut-off stream to global structures when threshold is reached (choose between {0|1}; default 0)',
+                   choices=[0, 1],
+                   type=int,
+                   default=-1)
     p.set_defaults(func=bdev_ocf_set_seqcutoff)
 
     def bdev_ocf_flush_start(args):
-        args.client.bdev_ocf_flush_start(name=args.name)
-    p = subparsers.add_parser('bdev_ocf_flush_start', help='Flush all dirty data from the OCF cache device to core devices')
-    p.add_argument('name', help='name of the OCF vbdev to flush')
+        args.client.bdev_ocf_flush_start(bdev_name=args.bdev_name)
+    p = subparsers.add_parser('bdev_ocf_flush_start', help='Flush all dirty data on the given OCF device (from cache to all of its cores or to particular core only). Note that this call only starts the flushing process which will be running in background and may take some time depending on the underlying device size and speed. You can check flushing status using the bdev_ocf_get_bdevs call.')
+    p.add_argument('bdev_name', help='name of OCF vbdev to flush')
     p.set_defaults(func=bdev_ocf_flush_start)
-
-    def bdev_ocf_flush_status(args):
-        print_json(args.client.bdev_ocf_flush_status(name=args.name))
-    p = subparsers.add_parser('bdev_ocf_flush_status', help='Get flush status of OCF vbdev')
-    p.add_argument('name', help='name of the OCF vbdev')
-    p.set_defaults(func=bdev_ocf_flush_status)
 
     def bdev_ocf_get_stats(args):
         print_dict(args.client.bdev_ocf_get_stats(name=args.name))
@@ -258,6 +289,12 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_reset_stats', help='Reset statistics of chosen OCF block device')
     p.add_argument('name', help='Name of OCF bdev')
     p.set_defaults(func=bdev_ocf_reset_stats)
+
+    def bdev_ocf_get_bdevs(args):
+        print_dict(args.client.bdev_ocf_get_bdevs(name=args.name))
+    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get info about OCF devices')
+    p.add_argument('name', nargs='?', help='optional name of specific OCF vbdev; shows all by default')
+    p.set_defaults(func=bdev_ocf_get_bdevs)
 
     def bdev_malloc_create(args):
         num_blocks = (args.total_size * 1024 * 1024) // args.block_size

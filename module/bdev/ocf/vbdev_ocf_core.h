@@ -35,6 +35,11 @@ struct vbdev_ocf_core {
 	char				cache_name[OCF_CACHE_NAME_SIZE];
 	/* Context for cache stop management operation. */
 	struct vbdev_ocf_mngt_ctx *	mngt_ctx;
+	/* Status of core flush operation. */
+	struct {
+		bool in_progress;
+		int error;
+	} flush;
 
 	STAILQ_ENTRY(vbdev_ocf_core)	waitlist_entry;
 };

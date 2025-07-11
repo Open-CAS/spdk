@@ -11,6 +11,7 @@
 #include "vbdev_ocf.h"
 #include "ctx.h"
 #include "data.h"
+#include "utils.h"
 #include "volume.h"
 
 /* This namespace UUID was generated using uuid_generate() method. */
@@ -587,7 +588,7 @@ _cache_attach_examine_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		goto err_alloc;
 	}
 	examine_attach_ctx->cache = cache;
-	examine_attach_ctx->att_cb_fn = _cache_attach_examine_attach_cb;
+	examine_attach_ctx->u.att_cb_fn = _cache_attach_examine_attach_cb;
 
 	if ((rc = vbdev_ocf_cache_volume_attach(cache, examine_attach_ctx))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to attach volume (OCF error: %d)\n",
@@ -1030,10 +1031,10 @@ vbdev_ocf_cache_start(const char *cache_name, const char *base_name,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	cache_start_ctx->cache = cache;
-	cache_start_ctx->att_cb_fn = _cache_start_rpc_attach_cb;
 	cache_start_ctx->rpc_cb_fn = rpc_cb_fn;
 	cache_start_ctx->rpc_cb_arg = rpc_cb_arg;
+	cache_start_ctx->cache = cache;
+	cache_start_ctx->u.att_cb_fn = _cache_start_rpc_attach_cb;
 
 	if ((rc = vbdev_ocf_cache_volume_attach(cache, cache_start_ctx))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to attach volume\n", cache_name);
@@ -1362,7 +1363,7 @@ static void
 _core_add_rpc_err_cb(void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *core_add_ctx = cb_arg;
-	struct vbdev_ocf_core *core_ctx = core_add_ctx->core_ctx;
+	struct vbdev_ocf_core *core_ctx = core_add_ctx->u.core_ctx;
 	ocf_cache_t cache = core_add_ctx->cache;
 
 	if (error) {
@@ -1382,7 +1383,7 @@ static void
 _core_add_rpc_add_cb(ocf_cache_t cache, ocf_core_t core, void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *core_add_ctx = cb_arg;
-	struct vbdev_ocf_core *core_ctx = core_add_ctx->core_ctx;
+	struct vbdev_ocf_core *core_ctx = core_add_ctx->u.core_ctx;
 	int rc = 0;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing add of OCF core\n",
@@ -1422,7 +1423,7 @@ static void
 _core_add_rpc_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *core_add_ctx = cb_arg;
-	struct vbdev_ocf_core *core_ctx = core_add_ctx->core_ctx;
+	struct vbdev_ocf_core *core_ctx = core_add_ctx->u.core_ctx;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating add of OCF core\n",
 		      vbdev_ocf_core_get_name(core_ctx));
@@ -1527,10 +1528,10 @@ vbdev_ocf_core_add(const char *core_name, const char *base_name, const char *cac
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	core_add_ctx->cache = cache;
-	core_add_ctx->core_ctx = core_ctx;
 	core_add_ctx->rpc_cb_fn = rpc_cb_fn;
 	core_add_ctx->rpc_cb_arg = rpc_cb_arg;
+	core_add_ctx->cache = cache;
+	core_add_ctx->u.core_ctx = core_ctx;
 
 	ocf_mngt_cache_lock(cache, _core_add_rpc_lock_cb, core_add_ctx);
 
@@ -1551,7 +1552,7 @@ static void
 _core_remove_rpc_remove_cb(void *cb_arg, int error)
 {
 	struct vbdev_ocf_mngt_ctx *core_rm_ctx = cb_arg;
-	struct vbdev_ocf_core *core_ctx = core_rm_ctx->core_ctx;
+	struct vbdev_ocf_core *core_ctx = core_rm_ctx->u.core_ctx;
 	ocf_cache_t cache = core_rm_ctx->cache;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing remove of OCF core\n",
@@ -1665,11 +1666,11 @@ vbdev_ocf_core_remove(const char *core_name, const char *cache_name,
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	core_rm_ctx->cache = cache;
-	core_rm_ctx->core = core;
-	core_rm_ctx->core_ctx = core_ctx;
 	core_rm_ctx->rpc_cb_fn = rpc_cb_fn;
 	core_rm_ctx->rpc_cb_arg = rpc_cb_arg;
+	core_rm_ctx->cache = cache;
+	core_rm_ctx->core = core;
+	core_rm_ctx->u.core_ctx = core_ctx;
 
 	if (!vbdev_ocf_core_is_base_attached(core_ctx)) {
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': removing detached (no unregister)\n", core_name);
@@ -1696,12 +1697,772 @@ err_cache:
 	rpc_cb_fn(core_name, rpc_cb_arg, rc);
 }
 
+static void
+_cache_save_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = cb_arg;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': saving cache state\n", ocf_cache_get_name(cache));
+
+	ocf_mngt_cache_unlock(cache);
+
+	if (error) {
+		SPDK_WARNLOG("OCF cache '%s': failed to save cache state (OCF error: %d)\n",
+			     ocf_cache_get_name(cache), error);
+	}
+
+	/* Ignore state save error caused by not attached cache volume. */
+	mngt_ctx->rpc_cb_fn(ocf_cache_get_name(cache), mngt_ctx->rpc_cb_arg,
+			    error == -OCF_ERR_CACHE_DETACHED ? 0 : error);
+	ocf_mngt_cache_put(cache);
+	free(mngt_ctx);
+}
+
+static void
+_cache_mode_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *cache_mode_ctx = cb_arg;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto err;
+	}
+
+	if ((rc = ocf_mngt_cache_set_mode(cache, cache_mode_ctx->u.cache_mode))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to change cache mode to '%s' (OCF error: %d)\n",
+			    ocf_cache_get_name(cache),
+			    vbdev_ocf_cachemode_get_name(cache_mode_ctx->u.cache_mode), rc);
+		ocf_mngt_cache_unlock(cache);
+		goto err;
+	}
+
+	ocf_mngt_cache_save(cache, _cache_save_cb, cache_mode_ctx);
+
+	return;
+
+err:
+	cache_mode_ctx->rpc_cb_fn(ocf_cache_get_name(cache), cache_mode_ctx->rpc_cb_arg, rc);
+	ocf_mngt_cache_put(cache);
+	free(cache_mode_ctx);
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_set_cachemode(const char *cache_name, const char *cache_mode,
+			vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	ocf_cache_t cache;
+	struct vbdev_ocf_mngt_ctx *cache_mode_ctx;
+	int rc = 0;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting new cache mode '%s'\n", cache_name, cache_mode);
+
+	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
+		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
+		rc = -ENXIO;
+		goto err_cache;
+	}
+
+	cache_mode_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!cache_mode_ctx) {
+		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for cache mode change context\n",
+			    cache_name);
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	cache_mode_ctx->u.cache_mode = vbdev_ocf_cachemode_get_by_name(cache_mode);
+	cache_mode_ctx->rpc_cb_fn = rpc_cb_fn;
+	cache_mode_ctx->rpc_cb_arg = rpc_cb_arg;
+
+	ocf_mngt_cache_lock(cache, _cache_mode_lock_cb, cache_mode_ctx);
+
+	return;
+
+err_alloc:
+	ocf_mngt_cache_put(cache);
+err_cache:
+	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
+}
+
+static void
+_promotion_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = cb_arg;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto err_lock;
+	}
+
+	if (mngt_ctx->u.promotion.policy >= ocf_promotion_always &&
+	    mngt_ctx->u.promotion.policy < ocf_promotion_max) {
+		if ((rc = ocf_mngt_cache_promotion_set_policy(cache, mngt_ctx->u.promotion.policy))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set promotion policy (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (mngt_ctx->u.promotion.nhit_insertion_threshold >= 0) {
+		if ((rc = ocf_mngt_cache_promotion_set_param(cache, ocf_promotion_nhit, ocf_nhit_insertion_threshold,
+							    mngt_ctx->u.promotion.nhit_insertion_threshold))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set promotion nhit_insertion_threshold param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (mngt_ctx->u.promotion.nhit_trigger_threshold >= 0) {
+		if ((rc = ocf_mngt_cache_promotion_set_param(cache, ocf_promotion_nhit, ocf_nhit_trigger_threshold,
+							    mngt_ctx->u.promotion.nhit_trigger_threshold))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set promotion nhit_trigger_threshold param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	ocf_mngt_cache_save(cache, _cache_save_cb, mngt_ctx);
+
+	return;
+
+err_param:
+	ocf_mngt_cache_unlock(cache);
+err_lock:
+	mngt_ctx->rpc_cb_fn(ocf_cache_get_name(cache), mngt_ctx->rpc_cb_arg, rc);
+	ocf_mngt_cache_put(cache);
+	free(mngt_ctx);
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_set_promotion(const char *cache_name, const char *policy,
+			int32_t nhit_insertion_threshold, int32_t nhit_trigger_threshold,
+			vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	ocf_cache_t cache;
+	struct vbdev_ocf_mngt_ctx *mngt_ctx;
+	int rc = 0;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting promotion params\n", cache_name);
+
+	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
+		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
+		rc = -ENXIO;
+		goto err_cache;
+	}
+
+	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!mngt_ctx) {
+		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for promotion set context\n",
+			    cache_name);
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
+	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
+	mngt_ctx->u.promotion.policy = vbdev_ocf_promotion_policy_get_by_name(policy);
+	mngt_ctx->u.promotion.nhit_insertion_threshold = nhit_insertion_threshold;
+	mngt_ctx->u.promotion.nhit_trigger_threshold = nhit_trigger_threshold;
+
+	ocf_mngt_cache_lock(cache, _promotion_lock_cb, mngt_ctx);
+
+	return;
+
+err_alloc:
+	ocf_mngt_cache_put(cache);
+err_cache:
+	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
+}
+
+static void
+_cleaning_policy_cb(void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *cleaning_ctx = cb_arg;
+	ocf_cache_t cache = cleaning_ctx->cache;
+
+	if (error) {
+		SPDK_ERRLOG("OCF cache '%s': failed to set cleaning policy (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		ocf_mngt_cache_unlock(cache);
+		cleaning_ctx->rpc_cb_fn(ocf_cache_get_name(cache), cleaning_ctx->rpc_cb_arg, error);
+		ocf_mngt_cache_put(cache);
+		free(cleaning_ctx);
+		return;
+	}
+
+	ocf_mngt_cache_save(cache, _cache_save_cb, cleaning_ctx);
+}
+
+static void
+_cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *cleaning_ctx = cb_arg;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto err_lock;
+	}
+
+	if (cleaning_ctx->u.cleaning.acp_wake_up_time >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp, ocf_acp_wake_up_time,
+							    cleaning_ctx->u.cleaning.acp_wake_up_time))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning acp_wake_up_time param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.acp_flush_max_buffers >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp, ocf_acp_flush_max_buffers,
+							    cleaning_ctx->u.cleaning.acp_flush_max_buffers))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning acp_flush_max_buffers param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.alru_wake_up_time >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_wake_up_time,
+							    cleaning_ctx->u.cleaning.alru_wake_up_time))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_wake_up_time param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.alru_flush_max_buffers >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_flush_max_buffers,
+							    cleaning_ctx->u.cleaning.alru_flush_max_buffers))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_flush_max_buffers param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.alru_staleness_time >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_stale_buffer_time,
+							    cleaning_ctx->u.cleaning.alru_staleness_time))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_staleness_time param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.alru_activity_threshold >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_activity_threshold,
+							    cleaning_ctx->u.cleaning.alru_activity_threshold))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_activity_threshold param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.alru_max_dirty_ratio >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_max_dirty_ratio,
+							    cleaning_ctx->u.cleaning.alru_max_dirty_ratio))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_max_dirty_ratio param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (cleaning_ctx->u.cleaning.policy >= ocf_cleaning_nop &&
+	    cleaning_ctx->u.cleaning.policy < ocf_cleaning_max) {
+		ocf_mngt_cache_cleaning_set_policy(cache, cleaning_ctx->u.cleaning.policy,
+						   _cleaning_policy_cb, cleaning_ctx);
+	} else {
+		ocf_mngt_cache_save(cache, _cache_save_cb, cleaning_ctx);
+	}
+
+	return;
+
+err_param:
+	ocf_mngt_cache_unlock(cache);
+err_lock:
+	cleaning_ctx->rpc_cb_fn(ocf_cache_get_name(cache), cleaning_ctx->rpc_cb_arg, rc);
+	ocf_mngt_cache_put(cache);
+	free(cleaning_ctx);
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_wake_up_time,
+		       int32_t acp_flush_max_buffers, int32_t alru_wake_up_time,
+		       int32_t alru_flush_max_buffers, int32_t alru_staleness_time,
+		       int32_t alru_activity_threshold, int32_t alru_max_dirty_ratio,
+		       vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	ocf_cache_t cache;
+	struct vbdev_ocf_mngt_ctx *cleaning_ctx;
+	int rc = 0;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting cleaning params\n", cache_name);
+
+	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
+		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
+		rc = -ENXIO;
+		goto err_cache;
+	}
+
+	cleaning_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!cleaning_ctx) {
+		SPDK_ERRLOG("OCF cache '%s': failed to allocate memory for cleaning set context\n",
+			    cache_name);
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	cleaning_ctx->u.cleaning.policy = vbdev_ocf_cleaning_policy_get_by_name(policy);
+	cleaning_ctx->u.cleaning.acp_wake_up_time = acp_wake_up_time;
+	cleaning_ctx->u.cleaning.acp_flush_max_buffers = acp_flush_max_buffers;
+	cleaning_ctx->u.cleaning.alru_wake_up_time = alru_wake_up_time;
+	cleaning_ctx->u.cleaning.alru_flush_max_buffers = alru_flush_max_buffers;
+	cleaning_ctx->u.cleaning.alru_staleness_time = alru_staleness_time;
+	cleaning_ctx->u.cleaning.alru_activity_threshold = alru_activity_threshold;
+	cleaning_ctx->u.cleaning.alru_max_dirty_ratio = alru_max_dirty_ratio;
+	cleaning_ctx->cache = cache;
+	cleaning_ctx->rpc_cb_fn = rpc_cb_fn;
+	cleaning_ctx->rpc_cb_arg = rpc_cb_arg;
+
+	ocf_mngt_cache_lock(cache, _cleaning_lock_cb, cleaning_ctx);
+
+	return;
+
+err_alloc:
+	ocf_mngt_cache_put(cache);
+err_cache:
+	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
+}
+
+static void
+_seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = cb_arg;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto err_lock;
+	}
+
+	if (mngt_ctx->core) {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': setting sequential cut-off on core device\n",
+			      mngt_ctx->bdev_name);
+
+		if (mngt_ctx->u.seqcutoff.policy >= ocf_seq_cutoff_policy_always &&
+		    mngt_ctx->u.seqcutoff.policy < ocf_seq_cutoff_policy_max) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_policy(mngt_ctx->core,
+								      mngt_ctx->u.seqcutoff.policy))) {
+				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off policy (OCF error: %d)\n",
+					    ocf_core_get_name(mngt_ctx->core), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.threshold >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_threshold(mngt_ctx->core,
+									 mngt_ctx->u.seqcutoff.threshold * KiB))) {
+				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off threshold (OCF error: %d)\n",
+					    ocf_core_get_name(mngt_ctx->core), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.promotion_count >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count(mngt_ctx->core,
+									       mngt_ctx->u.seqcutoff.promotion_count))) {
+				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off promotion_count (OCF error: %d)\n",
+					    ocf_core_get_name(mngt_ctx->core), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.promote_on_threshold >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold(mngt_ctx->core,
+										    mngt_ctx->u.seqcutoff.promote_on_threshold))) {
+				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off promote_on_threshold (OCF error: %d)\n",
+					    ocf_core_get_name(mngt_ctx->core), rc);
+				goto err_param;
+			}
+		}
+	} else {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': setting sequential cut-off on all cores in cache device\n",
+			      mngt_ctx->bdev_name);
+
+		if (mngt_ctx->u.seqcutoff.policy >= ocf_seq_cutoff_policy_always &&
+		    mngt_ctx->u.seqcutoff.policy < ocf_seq_cutoff_policy_max) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_policy_all(cache,
+									  mngt_ctx->u.seqcutoff.policy))) {
+				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off policy (OCF error: %d)\n",
+					    ocf_cache_get_name(cache), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.threshold >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_threshold_all(cache,
+									     mngt_ctx->u.seqcutoff.threshold * KiB))) {
+				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off threshold (OCF error: %d)\n",
+					    ocf_cache_get_name(cache), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.promotion_count >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count_all(cache,
+										   mngt_ctx->u.seqcutoff.promotion_count))) {
+				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off promotion_count (OCF error: %d)\n",
+					    ocf_cache_get_name(cache), rc);
+				goto err_param;
+			}
+		}
+
+		if (mngt_ctx->u.seqcutoff.promote_on_threshold >= 0) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold_all(cache,
+											mngt_ctx->u.seqcutoff.promote_on_threshold))) {
+				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off promote_on_threshold (OCF error: %d)\n",
+					    ocf_cache_get_name(cache), rc);
+				goto err_param;
+			}
+		}
+	}
+
+	/* For compatibility with global _cache_save_cb(). */
+	ocf_mngt_cache_get(cache);
+
+	ocf_mngt_cache_save(cache, _cache_save_cb, mngt_ctx);
+
+	return;
+
+err_param:
+	ocf_mngt_cache_unlock(cache);
+err_lock:
+	mngt_ctx->rpc_cb_fn(mngt_ctx->bdev_name, mngt_ctx->rpc_cb_arg, rc);
+	free(mngt_ctx);
+}
+
+static int
+_seqcutoff_cache_visitor(ocf_cache_t cache, void *ctx)
+{
+	ocf_core_t core;
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = ctx;
+	int rc;
+
+	if (!strcmp(mngt_ctx->bdev_name, ocf_cache_get_name(cache))) {
+		ocf_mngt_cache_lock(cache, _seqcutoff_lock_cb, mngt_ctx);
+		return -EEXIST;
+	}
+
+	rc = ocf_core_get_by_name(cache, mngt_ctx->bdev_name, OCF_CORE_NAME_SIZE, &core);
+	if (!rc) {
+		mngt_ctx->core = core;
+		ocf_mngt_cache_lock(cache, _seqcutoff_lock_cb, mngt_ctx);
+		return -EEXIST;
+	}
+
+	return rc == -OCF_ERR_CORE_NOT_EXIST ? 0 : rc;
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_set_seqcutoff(const char *bdev_name, const char *policy, int32_t threshold,
+		       int32_t promotion_count, int32_t promote_on_threshold,
+		       vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': setting sequential cut-off params\n", bdev_name);
+
+	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!mngt_ctx) {
+		SPDK_ERRLOG("OCF '%s': failed to allocate memory for sequential cut-off set context\n",
+			    bdev_name);
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -ENOMEM);
+		return;
+	}
+	mngt_ctx->bdev_name = bdev_name;
+	/* Will be used later if given bdev is a core device. */
+	mngt_ctx->core = NULL;
+	mngt_ctx->u.seqcutoff.policy = vbdev_ocf_seqcutoff_policy_get_by_name(policy);
+	mngt_ctx->u.seqcutoff.threshold = threshold;
+	mngt_ctx->u.seqcutoff.promotion_count = promotion_count;
+	mngt_ctx->u.seqcutoff.promote_on_threshold = promote_on_threshold;
+	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
+	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
+
+	rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _seqcutoff_cache_visitor, mngt_ctx);
+	if (rc && rc != -EEXIST) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+		rpc_cb_fn(bdev_name, rpc_cb_arg, rc);
+	} else if (!rc) {
+		SPDK_ERRLOG("OCF '%s': not exist\n", bdev_name);
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -ENXIO);
+	}
+}
+
+static void
+_flush_cache_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': finishing flush operation\n",
+		      ocf_cache_get_name(cache));
+
+	ocf_mngt_cache_read_unlock(cache);
+
+	cache_ctx->flush.error = error;
+	cache_ctx->flush.in_progress = false;
+}
+
+static void
+_flush_core_cb(ocf_core_t core, void *cb_arg, int error)
+{
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': finishing flush operation\n",
+		      ocf_core_get_name(core));
+
+	ocf_mngt_cache_read_unlock(ocf_core_get_cache(core));
+
+	core_ctx->flush.error = error;
+	core_ctx->flush.in_progress = false;
+}
+
+static void
+_flush_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *flush_ctx = cb_arg;
+	struct vbdev_ocf_cache *cache_ctx;
+	struct vbdev_ocf_core *core_ctx;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto end;
+	}
+
+	if (flush_ctx->core) {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': flushing core device\n", flush_ctx->bdev_name);
+
+		core_ctx = ocf_core_get_priv(flush_ctx->core);
+		core_ctx->flush.in_progress = true;
+		ocf_mngt_core_flush(flush_ctx->core, _flush_core_cb, NULL);
+	} else {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': flushing cache device\n", flush_ctx->bdev_name);
+
+		cache_ctx = ocf_cache_get_priv(cache);
+		cache_ctx->flush.in_progress = true;
+		ocf_mngt_cache_flush(cache, _flush_cache_cb, NULL);
+	}
+
+end:
+	/* Flushing process may take some time to finish, so call
+	 * RPC callback now and leave flush running in background. */
+	flush_ctx->rpc_cb_fn(flush_ctx->bdev_name, flush_ctx->rpc_cb_arg, rc);
+	free(flush_ctx);
+}
+
+static int
+_flush_cache_visitor(ocf_cache_t cache, void *ctx)
+{
+	ocf_core_t core;
+	struct vbdev_ocf_mngt_ctx *flush_ctx = ctx;
+	int rc;
+
+	if (!strcmp(flush_ctx->bdev_name, ocf_cache_get_name(cache))) {
+		ocf_mngt_cache_read_lock(cache, _flush_lock_cb, flush_ctx);
+		return -EEXIST;
+	}
+
+	rc = ocf_core_get_by_name(cache, flush_ctx->bdev_name, OCF_CORE_NAME_SIZE, &core);
+	if (!rc) {
+		flush_ctx->core = core;
+		ocf_mngt_cache_read_lock(cache, _flush_lock_cb, flush_ctx);
+		return -EEXIST;
+	}
+
+	return rc == -OCF_ERR_CORE_NOT_EXIST ? 0 : rc;
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_flush_start(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	struct vbdev_ocf_mngt_ctx *flush_ctx;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': initiating flush operation\n", bdev_name);
+
+	flush_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!flush_ctx) {
+		SPDK_ERRLOG("OCF '%s': failed to allocate memory for flush context\n", bdev_name);
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -ENOMEM);
+		return;
+	}
+	flush_ctx->bdev_name = bdev_name;
+	/* Will be used later if given bdev is a core device. */
+	flush_ctx->core = NULL;
+	flush_ctx->rpc_cb_fn = rpc_cb_fn;
+	flush_ctx->rpc_cb_arg = rpc_cb_arg;
+
+	rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _flush_cache_visitor, flush_ctx);
+	if (rc && rc != -EEXIST) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+		rpc_cb_fn(bdev_name, rpc_cb_arg, rc);
+	} else if (!rc) {
+		SPDK_ERRLOG("OCF '%s': not exist\n", bdev_name);
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -ENXIO);
+	}
+}
+
+static int
+_dump_promotion_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
+{
+	ocf_promotion_t promotion_policy;
+	uint32_t param_val;
+	int rc;
+
+	if ((rc = ocf_mngt_cache_promotion_get_policy(cache, &promotion_policy))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to get promotion policy (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), rc);
+		spdk_json_write_named_string(w, "policy", "");
+		return rc;
+	}
+	spdk_json_write_named_string(w, "policy",
+				     vbdev_ocf_promotion_policy_get_name(promotion_policy));
+
+	if (promotion_policy == ocf_promotion_nhit) {
+		if ((rc = ocf_mngt_cache_promotion_get_param(cache, ocf_promotion_nhit,
+							     ocf_nhit_insertion_threshold, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "insertion_threshold", param_val);
+
+		if ((rc = ocf_mngt_cache_promotion_get_param(cache, ocf_promotion_nhit,
+							     ocf_nhit_trigger_threshold, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "trigger_threshold", param_val);
+
+	}
+
+	return 0;
+}
+
+static int
+_dump_cleaning_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
+{
+	ocf_cleaning_t cleaning_policy;
+	uint32_t param_val;
+	int rc;
+
+	if ((rc = ocf_mngt_cache_cleaning_get_policy(cache, &cleaning_policy))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to get cleaning policy (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), rc);
+		spdk_json_write_named_string(w, "policy", "");
+		return rc;
+	}
+	spdk_json_write_named_string(w, "policy",
+				     vbdev_ocf_cleaning_policy_get_name(cleaning_policy));
+
+	if (cleaning_policy == ocf_cleaning_acp) {
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
+							    ocf_acp_wake_up_time, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "wake_up_time", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
+							    ocf_acp_flush_max_buffers, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "flush_max_buffers", param_val);
+
+	} else if (cleaning_policy == ocf_cleaning_alru) {
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+							    ocf_alru_wake_up_time, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "wake_up_time", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+							    ocf_alru_flush_max_buffers, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "flush_max_buffers", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+							    ocf_alru_stale_buffer_time, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "staleness_time", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+							    ocf_alru_activity_threshold, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "activity_threshold", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+							    ocf_alru_max_dirty_ratio, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "max_dirty_ratio", param_val);
+	}
+
+	return 0;
+}
+
+static int
+_dump_seqcutoff_info(struct spdk_json_write_ctx *w, ocf_core_t core)
+{
+	ocf_seq_cutoff_policy seqcutoff_policy;
+	uint32_t param_val_int;
+	bool param_val_bool;
+	int rc;
+
+	if ((rc = ocf_mngt_core_get_seq_cutoff_policy(core, &seqcutoff_policy))) {
+		SPDK_ERRLOG("OCF core '%s': failed to get sequential cut-off policy (OCF error: %d)\n",
+			    ocf_core_get_name(core), rc);
+		spdk_json_write_named_string(w, "policy", "");
+		return rc;
+	}
+	spdk_json_write_named_string(w, "policy",
+				     vbdev_ocf_seqcutoff_policy_get_name(seqcutoff_policy));
+
+	if ((rc = ocf_mngt_core_get_seq_cutoff_threshold(core, &param_val_int))) {
+		return rc;
+	}
+	spdk_json_write_named_uint32(w, "threshold", param_val_int / KiB);
+
+	if ((rc = ocf_mngt_core_get_seq_cutoff_promotion_count(core, &param_val_int))) {
+		return rc;
+	}
+	spdk_json_write_named_uint32(w, "promotion_count", param_val_int);
+
+	if ((rc = ocf_mngt_core_get_seq_cutoff_promote_on_threshold(core, &param_val_bool))) {
+		return rc;
+	}
+	spdk_json_write_named_bool(w, "promote_on_threshold", param_val_bool);
+
+	return 0;
+}
+
 // handle errors ?
 static int
 _get_bdevs_core_visit(ocf_core_t core, void *cb_arg)
 {
 	struct spdk_json_write_ctx *w = cb_arg;
 	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+	int rc;
 
 	spdk_json_write_object_begin(w);
 	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
@@ -1709,11 +2470,25 @@ _get_bdevs_core_visit(ocf_core_t core, void *cb_arg)
 	spdk_json_write_named_bool(w, "base_attached",
 				   core_ctx ? vbdev_ocf_core_is_base_attached(core_ctx) : false);
 	spdk_json_write_named_bool(w, "loading", !core_ctx);
+
+	spdk_json_write_named_object_begin(w, "seq_cutoff");
+	if ((rc = _dump_seqcutoff_info(w, core))) {
+		SPDK_ERRLOG("OCF core '%s': failed to get sequential cut-off params info (OCF error: %d)\n",
+			    ocf_core_get_name(core), rc);
+	}
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_named_object_begin(w, "flush");
+	spdk_json_write_named_bool(w, "in_progress", core_ctx ? core_ctx->flush.in_progress : false);
+	spdk_json_write_named_int32(w, "error", core_ctx ? core_ctx->flush.error : 0);
+	spdk_json_write_object_end(w);
+
 	spdk_json_write_object_end(w);
 
 	return 0;
 }
 
+// handle errors ?
 static int
 _get_bdevs_cache_visit(ocf_cache_t cache, void *cb_arg)
 {
@@ -1725,12 +2500,35 @@ _get_bdevs_cache_visit(ocf_cache_t cache, void *cb_arg)
 	spdk_json_write_named_string(w, "name", ocf_cache_get_name(cache));
 	spdk_json_write_named_string(w, "base_name", cache_ctx->base.name);
 	spdk_json_write_named_bool(w, "base_attached", ocf_cache_is_device_attached(cache));
+	spdk_json_write_named_string(w, "cache_mode",
+				     vbdev_ocf_cachemode_get_name(ocf_cache_get_mode(cache)));
+	spdk_json_write_named_uint32(w, "cache_line_size",
+				     ocf_cache_get_line_size(cache) / KiB);
+
+	spdk_json_write_named_object_begin(w, "promotion");
+	if ((rc = _dump_promotion_info(w, cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to get promotion params info (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), rc);
+	}
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_named_object_begin(w, "cleaning");
+	if ((rc = _dump_cleaning_info(w, cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to get cleaning params info (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), rc);
+	}
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_named_object_begin(w, "flush");
+	spdk_json_write_named_bool(w, "in_progress", cache_ctx->flush.in_progress);
+	spdk_json_write_named_int32(w, "error", cache_ctx->flush.error);
+	spdk_json_write_object_end(w);
+
 	spdk_json_write_named_uint16(w, "cores_count", ocf_cache_get_core_count(cache));
 	spdk_json_write_named_array_begin(w, "cores");
-
 	rc = ocf_core_visit(cache, _get_bdevs_core_visit, w, false);
-
 	spdk_json_write_array_end(w);
+
 	spdk_json_write_object_end(w);
 
 	return rc;

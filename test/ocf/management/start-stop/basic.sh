@@ -130,7 +130,7 @@ for stop_caches in false true; do
 	__check_caches_attached
 	__check_cores_attached
 	for i in {1..3}; do
-		$rpc_py bdev_ocf_remove_core Ocf_core$i-1 Ocf_cache$i
+		$rpc_py bdev_ocf_remove_core Ocf_core$i-1
 	done
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 2'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 2'
@@ -153,8 +153,8 @@ for stop_caches in false true; do
 	__check_caches_attached
 	__check_cores_attached
 	for i in {1..3}; do
-		$rpc_py bdev_ocf_remove_core Ocf_core$i-2 Ocf_cache$i
-		$rpc_py bdev_ocf_remove_core Ocf_core$i-3 Ocf_cache$i
+		$rpc_py bdev_ocf_remove_core Ocf_core$i-2
+		$rpc_py bdev_ocf_remove_core Ocf_core$i-3
 	done
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 1'
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 1'

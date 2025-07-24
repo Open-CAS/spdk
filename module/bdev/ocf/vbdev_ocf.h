@@ -9,10 +9,15 @@
 #include "vbdev_ocf_cache.h"
 #include "vbdev_ocf_core.h"
 
+/* Callback for the RPC layer used in all management operations. */
 typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
+
+/* Callback for the RPC layer used in bdev_ocf_get_bdevs call. */
 typedef void (*vbdev_ocf_get_bdevs_cb)(void *cb_arg1, void *cb_arg2);
 
-/* RPC entry points. */
+/*
+ * RPC entry points:
+ */
 
 void vbdev_ocf_cache_start(const char *cache_name,
 			   const char *base_name,
@@ -43,7 +48,6 @@ void vbdev_ocf_core_add(const char *core_name,
 			void *rpc_cb_arg);
 
 void vbdev_ocf_core_remove(const char *core_name,
-			   const char *cache_name,
 			   vbdev_ocf_rpc_mngt_cb rpc_cb_fn,
 			   void *rpc_cb_arg);
 
@@ -70,7 +74,7 @@ void vbdev_ocf_flush_start(const char *bdev_name,
 			   vbdev_ocf_rpc_mngt_cb rpc_cb_fn,
 			   void *rpc_cb_arg);
 
-void vbdev_ocf_get_bdevs(const char *name,
+void vbdev_ocf_get_bdevs(const char *bdev_name,
 			 vbdev_ocf_get_bdevs_cb rpc_cb_fn,
 			 void *rpc_cb_arg1,
 			 void *rpc_cb_arg2);

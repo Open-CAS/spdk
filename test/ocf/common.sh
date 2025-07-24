@@ -129,7 +129,7 @@ add_cores() {
 remove_cores() {
 	for i in {1..3}; do
 		for j in {1..3}; do
-			$rpc_py bdev_ocf_remove_core Ocf_core$i-$j Ocf_cache$i
+			$rpc_py bdev_ocf_remove_core Ocf_core$i-$j
 		done
 	done
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'

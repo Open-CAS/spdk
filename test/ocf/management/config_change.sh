@@ -312,7 +312,7 @@ __check_seqcutoff_params() {
 		--argjson promote_on_threshold $promote_on_threshold \
 		'.caches[].cores[0].seq_cutoff |
 		(.policy == $policy) and
-		(.threshold == $threshold) and
+		(.threshold == $threshold * 1024) and
 		(.promotion_count == $promotion_count) and
 		(.promote_on_threshold == $promote_on_threshold)'
 
@@ -323,7 +323,7 @@ __check_seqcutoff_params() {
 		--argjson promote_on_threshold $seqcutoff_promote_on_threshold_default \
 		'.caches[].cores[1].seq_cutoff |
 		(.policy == $policy) and
-		(.threshold == $threshold) and
+		(.threshold == $threshold * 1024) and
 		(.promotion_count == $promotion_count) and
 		(.promote_on_threshold == $promote_on_threshold)'
 }
@@ -350,7 +350,7 @@ __check_seqcutoff_params_all() {
 		--argjson promote_on_threshold $promote_on_threshold \
 		'.caches[].cores[].seq_cutoff |
 		(.policy == $policy) and
-		(.threshold == $threshold) and
+		(.threshold == $threshold * 1024) and
 		(.promotion_count == $promotion_count) and
 		(.promote_on_threshold == $promote_on_threshold)'
 }

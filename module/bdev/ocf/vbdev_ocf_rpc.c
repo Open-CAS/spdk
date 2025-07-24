@@ -38,9 +38,9 @@ rpc_bdev_ocf_start_cache_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_json_write_ctx *w;
 
 	if (error && error != -ENODEV) {
-		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						     "Could not start OCF cache: %s",
-						     spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to start OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -91,7 +91,9 @@ rpc_bdev_ocf_stop_cache_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to stop OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -139,9 +141,9 @@ rpc_bdev_ocf_detach_cache_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						     "Could not detach OCF cache: %s",
-						     spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to detach device from OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -194,9 +196,9 @@ rpc_bdev_ocf_attach_cache_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error && error != -ENODEV) {
-		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						     "Could not attach OCF cache: %s",
-						     spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to attach device to OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -252,9 +254,9 @@ rpc_bdev_ocf_add_core_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_json_write_ctx *w;
 
 	if (error && error != -ENODEV) {
-		spdk_jsonrpc_send_error_response_fmt(request, SPDK_JSONRPC_ERROR_INTERNAL_ERROR,
-						     "Could not add core to OCF cache: %s",
-						     spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to add core '%s' to OCF cache: %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -286,19 +288,16 @@ SPDK_RPC_REGISTER("bdev_ocf_add_core", rpc_bdev_ocf_add_core, SPDK_RPC_RUNTIME)
 
 struct rpc_bdev_ocf_remove_core {
 	char *core_name;
-	char *cache_name;
 };
 
 static void
 free_rpc_bdev_ocf_remove_core(struct rpc_bdev_ocf_remove_core *r)
 {
 	free(r->core_name);
-	free(r->cache_name);
 }
 
 static const struct spdk_json_object_decoder rpc_bdev_ocf_remove_core_decoders[] = {
 	{"core_name", offsetof(struct rpc_bdev_ocf_remove_core, core_name), spdk_json_decode_string},
-	{"cache_name", offsetof(struct rpc_bdev_ocf_remove_core, cache_name), spdk_json_decode_string},
 };
 
 static void
@@ -307,7 +306,9 @@ rpc_bdev_ocf_remove_core_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to remove core '%s' from OCF cache: %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -328,7 +329,7 @@ rpc_bdev_ocf_remove_core(struct spdk_jsonrpc_request *request, const struct spdk
 		goto cleanup;
 	}
 
-	vbdev_ocf_core_remove(req.core_name, req.cache_name, rpc_bdev_ocf_remove_core_cb, request);
+	vbdev_ocf_core_remove(req.core_name, rpc_bdev_ocf_remove_core_cb, request);
 
 cleanup:
 	free_rpc_bdev_ocf_remove_core(&req);
@@ -358,7 +359,9 @@ rpc_bdev_ocf_set_cachemode_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to change cache mode on OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -413,7 +416,9 @@ rpc_bdev_ocf_set_promotion_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to set promotion params on OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -479,7 +484,9 @@ rpc_bdev_ocf_set_cleaning_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to set cleaning params on OCF cache '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -540,7 +547,9 @@ rpc_bdev_ocf_set_seqcutoff_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to set sequential cut-off params on OCF cache or core '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -589,7 +598,9 @@ rpc_bdev_ocf_flush_start_cb(const char *bdev_name, void *cb_arg, int error)
 	struct spdk_jsonrpc_request *request = cb_arg;
 
 	if (error) {
-		spdk_jsonrpc_send_error_response(request, error, spdk_strerror(-error));
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to start flushing OCF cache or core '%s': %s",
+						     bdev_name, spdk_strerror(-error));
 		return;
 	}
 
@@ -630,17 +641,17 @@ rpc_bdev_ocf_reset_stats(struct spdk_jsonrpc_request *request, const struct spdk
 SPDK_RPC_REGISTER("bdev_ocf_reset_stats", rpc_bdev_ocf_reset_stats, SPDK_RPC_RUNTIME)
 
 struct rpc_bdev_ocf_get_bdevs {
-	char *name;
+	char *bdev_name;
 };
 
 static void
 free_rpc_bdev_ocf_get_bdevs(struct rpc_bdev_ocf_get_bdevs *r)
 {
-	free(r->name);
+	free(r->bdev_name);
 }
 
 static const struct spdk_json_object_decoder rpc_bdev_ocf_get_bdevs_decoders[] = {
-	{"name", offsetof(struct rpc_bdev_ocf_get_bdevs, name), spdk_json_decode_string, true},
+	{"bdev_name", offsetof(struct rpc_bdev_ocf_get_bdevs, bdev_name), spdk_json_decode_string, true},
 };
 
 static void
@@ -671,7 +682,7 @@ rpc_bdev_ocf_get_bdevs(struct spdk_jsonrpc_request *request, const struct spdk_j
 	w = spdk_jsonrpc_begin_result(request);
 	spdk_json_write_object_begin(w);
 
-	vbdev_ocf_get_bdevs(params ? req.name : NULL, rpc_bdev_ocf_get_bdevs_cb, w, request);
+	vbdev_ocf_get_bdevs(params ? req.bdev_name : NULL, rpc_bdev_ocf_get_bdevs_cb, w, request);
 
 cleanup:
 	free_rpc_bdev_ocf_get_bdevs(&req);

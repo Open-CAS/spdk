@@ -3,7 +3,7 @@
  *   All rights reserved.
  */
 
-#include "spdk/string.h" // rm ?
+#include "spdk/string.h"
 
 #include "vbdev_ocf_core.h"
 #include "vbdev_ocf_cache.h"
@@ -11,6 +11,88 @@
 
 struct vbdev_ocf_core_waitlist_head g_vbdev_ocf_core_waitlist =
 		STAILQ_HEAD_INITIALIZER(g_vbdev_ocf_core_waitlist);
+
+void
+vbdev_ocf_core_waitlist_add(struct vbdev_ocf_core *core_ctx)
+{
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': adding to wait list\n",
+		      vbdev_ocf_core_get_name(core_ctx));
+
+	STAILQ_INSERT_TAIL(&g_vbdev_ocf_core_waitlist, core_ctx, waitlist_entry);
+}
+
+void
+vbdev_ocf_core_waitlist_remove(struct vbdev_ocf_core *core_ctx)
+{
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': removing from wait list\n",
+		      vbdev_ocf_core_get_name(core_ctx));
+
+	STAILQ_REMOVE(&g_vbdev_ocf_core_waitlist, core_ctx, vbdev_ocf_core, waitlist_entry);
+}
+
+struct vbdev_ocf_core *
+vbdev_ocf_core_waitlist_get_by_name(const char *core_name)
+{
+	struct vbdev_ocf_core *core_ctx;
+
+	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
+		if (!strcmp(core_name, vbdev_ocf_core_get_name(core_ctx))) {
+			return core_ctx;
+		}
+	}
+
+	return NULL;
+}
+
+char *
+vbdev_ocf_core_get_name(struct vbdev_ocf_core *core_ctx)
+{
+	return core_ctx->core_cfg.name;
+}
+
+bool
+vbdev_ocf_core_is_base_attached(struct vbdev_ocf_core *core_ctx)
+{
+	return core_ctx->base.attached;
+}
+
+static int
+_core_is_loaded_cache_visitor(ocf_cache_t cache, void *cb_arg)
+{
+	const char *core_name = cb_arg;
+	ocf_core_t core;
+	int rc;
+
+	rc = ocf_core_get_by_name(cache, core_name, OCF_CORE_NAME_SIZE, &core);
+	if (!rc && !ocf_core_get_priv(core)) {
+		/* Core context is assigned only after manual core add (either right
+		 * away if all devices are present, after corresponding cache start,
+		 * or base bdev appearance).
+		 * If there is no context, it means that this core was just added from
+		 * metadata during cache load and that's what we're looking for here. */
+
+		return -EEXIST;
+	} else if (rc && rc != -OCF_ERR_CORE_NOT_EXIST) {
+		SPDK_ERRLOG("OCF: failed to get core: %s\n", spdk_strerror(-rc));
+	}
+
+	return 0;
+}
+
+bool
+vbdev_ocf_core_is_loaded(const char *core_name)
+{
+	int rc;
+
+	rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _core_is_loaded_cache_visitor, (char *)core_name);
+	if (rc == -EEXIST) {
+		return true;
+	} else if (rc) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+	}
+
+	return false;
+}
 
 int
 vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name, const char *cache_name)
@@ -59,30 +141,26 @@ static void
 vbdev_ocf_core_hotremove(struct spdk_bdev *bdev, void *event_ctx)
 {
 	struct vbdev_ocf_core *core_ctx = event_ctx;
-	struct vbdev_ocf_core *core_ctx_waitlist;
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating hot removal of base bdev '%s'\n",
 		      vbdev_ocf_core_get_name(core_ctx), spdk_bdev_get_name(bdev));
 
 	assert(bdev == core_ctx->base.bdev);
+	assert(vbdev_ocf_core_is_base_attached(core_ctx));
 
-	vbdev_ocf_foreach_core_in_waitlist(core_ctx_waitlist) {
-		if (core_ctx == core_ctx_waitlist) {
-			SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': hot removing from wait list\n",
-				      vbdev_ocf_core_get_name(core_ctx));
-			// always true ?
-			if (vbdev_ocf_core_is_base_attached(core_ctx)) {
-				vbdev_ocf_core_base_detach(core_ctx);
-				return;
-			}
-		}
+	if (vbdev_ocf_core_waitlist_get_by_name(vbdev_ocf_core_get_name(core_ctx))) {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': hot removing from wait list\n",
+			      vbdev_ocf_core_get_name(core_ctx));
+
+		vbdev_ocf_core_base_detach(core_ctx);
+		return;
 	}
 
 	if ((rc = vbdev_ocf_core_unregister(core_ctx, NULL, NULL))) {
 		SPDK_ERRLOG("OCF core '%s': failed to start unregistering OCF vbdev during core hot removal: %s\n",
 			    vbdev_ocf_core_get_name(core_ctx), spdk_strerror(-rc));
-		// detach base despite the error ?
+		/* Base bdev is already removed so detach it despite the error. */
 		vbdev_ocf_core_base_detach(core_ctx);
 	}
 }
@@ -141,9 +219,6 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	core_cfg->volume_type = SPDK_OBJECT;
 	// for ocf_volume_open() in ocf_mngt_cache_add_core()
 	core_cfg->volume_params = base;
-
-	// why not ? what is it then ?!?
-	//assert(__bdev_to_io_dev(base->bdev) == base->bdev->ctxt);
 
 	return rc;
 }
@@ -301,9 +376,9 @@ vbdev_ocf_core_register(ocf_core_t core)
 	ocf_vbdev->write_cache = base->bdev->write_cache;
 	ocf_vbdev->blocklen = base->bdev->blocklen;
 	ocf_vbdev->blockcnt = base->bdev->blockcnt;
-	// ?
-	//ocf_vbdev->required_alignment = base->bdev->required_alignment;
-	//ocf_vbdev->optimal_io_boundary = base->bdev->optimal_io_boundary;
+	// cache_line_size align ?
+	ocf_vbdev->required_alignment = base->bdev->required_alignment;
+	ocf_vbdev->optimal_io_boundary = base->bdev->optimal_io_boundary;
 	// generate UUID based on namespace UUID + base bdev UUID (take from old module?)
 	ocf_vbdev->fn_table = &vbdev_ocf_fn_table;
 	ocf_vbdev->module = &ocf_if;
@@ -374,7 +449,7 @@ _core_add_from_waitlist_add_cb(ocf_cache_t cache, ocf_core_t core, void *cb_arg,
 		       ocf_core_get_name(core), ocf_cache_get_name(cache));
 
 	ocf_mngt_cache_unlock(cache);
-	STAILQ_REMOVE(&g_vbdev_ocf_core_waitlist, core_ctx, vbdev_ocf_core, waitlist_entry);
+	vbdev_ocf_core_waitlist_remove(core_ctx);
 }
 
 static void
@@ -397,8 +472,9 @@ _core_add_from_waitlist_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 void
 vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 {
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 	struct vbdev_ocf_core *core_ctx;
-	uint32_t cache_block_size = ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->base.bdev->blocklen;
+	uint32_t cache_block_size = spdk_bdev_get_block_size(cache_ctx->base.bdev);
 	uint32_t core_block_size;
 
 	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
@@ -410,7 +486,7 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 		SPDK_NOTICELOG("OCF core '%s': adding from waitlist to cache '%s'\n",
 			       vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache));
 
-		core_block_size = core_ctx->base.bdev->blocklen;
+		core_block_size = spdk_bdev_get_block_size(core_ctx->base.bdev);
 		if (cache_block_size > core_block_size) {
 			SPDK_ERRLOG("OCF core '%s': failed to add to cache '%s': cache block size (%d) is greater than core block size (%d)\n",
 				    vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache),
@@ -422,70 +498,4 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 
 		ocf_mngt_cache_lock(cache, _core_add_from_waitlist_lock_cb, core_ctx);
 	}
-}
-
-char *
-vbdev_ocf_core_get_name(struct vbdev_ocf_core *core_ctx)
-{
-	return core_ctx->core_cfg.name;
-}
-
-struct vbdev_ocf_core *
-vbdev_ocf_core_waitlist_get_by_name(const char *core_name)
-{
-	struct vbdev_ocf_core *core_ctx;
-
-	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
-		// if (core_ctx && ...) ?
-		if (!strcmp(core_name, vbdev_ocf_core_get_name(core_ctx))) {
-			return core_ctx;
-		}
-	}
-
-	return NULL;
-}
-
-bool
-vbdev_ocf_core_is_base_attached(struct vbdev_ocf_core *core_ctx)
-{
-	return core_ctx->base.attached;
-}
-
-static int
-_core_is_loaded_core_visit(ocf_core_t core, void *cb_arg)
-{
-	const char *core_name = cb_arg;
-	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
-
-	if (!strcmp(core_name, ocf_core_get_name(core)) && !core_ctx) {
-		/* Core context is assigned only after manual core add (either right away
-		 * if all devices are present, after corresponding cache start, or base bdev
-		 * appearance).
-		 * If there is no context, it means that this core was added from metadata
-		 * during cache load. */
-		return -EEXIST;
-	}
-
-	return 0;
-}
-
-static int
-_core_is_loaded_cache_visit(ocf_cache_t cache, void *cb_arg)
-{
-	return ocf_core_visit(cache, _core_is_loaded_core_visit, cb_arg, false);
-}
-
-bool
-vbdev_ocf_core_is_loaded(const char *core_name)
-{
-	int rc;
-
-	rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _core_is_loaded_cache_visit, (char *)core_name);
-	if (rc == -EEXIST) {
-		return true;
-	} else if (rc) {
-		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
-	}
-
-	return false;
 }

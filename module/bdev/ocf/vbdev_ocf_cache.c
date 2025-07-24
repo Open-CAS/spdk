@@ -7,6 +7,14 @@
 #include "ctx.h"
 #include "utils.h"
 
+bool
+vbdev_ocf_cache_is_base_attached(ocf_cache_t cache)
+{
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	return cache_ctx->base.attached;
+}
+
 int
 vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cache_mode,
 		       const uint8_t cache_line_size, bool no_load)
@@ -111,6 +119,7 @@ vbdev_ocf_cache_hotremove(struct spdk_bdev *bdev, void *event_ctx)
 
 	assert(bdev == ((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->base.bdev);
 	assert(ocf_cache_is_device_attached(cache));
+	assert(vbdev_ocf_cache_is_base_attached(cache));
 
 	ocf_mngt_cache_lock(cache, _cache_hotremove_lock_cb, NULL);
 }
@@ -167,9 +176,6 @@ vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name)
 	base->is_cache = true;
 	base->attached = true;
 
-	// why not ? what is it then ?!?
-	//assert(__bdev_to_io_dev(base->bdev) == base->bdev->ctxt);
-
 	return rc;
 }
 
@@ -196,8 +202,8 @@ vbdev_ocf_cache_config_volume_create(ocf_cache_t cache)
 	ocf_mngt_cache_attach_config_set_default(cache_att_cfg);
 	cache_att_cfg->cache_line_size = cache_ctx->cache_cfg.cache_line_size;
 	cache_att_cfg->open_cores = false;
-	cache_att_cfg->discard_on_start = false; // needed ?
-	cache_att_cfg->device.perform_test = false; // needed ?
+	cache_att_cfg->discard_on_start = false;
+	cache_att_cfg->device.perform_test = false;
 	// for ocf_volume_open() in ocf_mngt_cache_attach/load()
 	cache_att_cfg->device.volume_params = &cache_ctx->base;
 	cache_att_cfg->force = cache_ctx->no_load;
@@ -229,39 +235,39 @@ vbdev_ocf_cache_config_volume_destroy(ocf_cache_t cache)
 static void
 _volume_attach_metadata_probe_cb(void *priv, int error, struct ocf_metadata_probe_status *status)
 {
-	struct vbdev_ocf_mngt_ctx *ctx = priv;
-	ocf_cache_t cache = ctx->cache;
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = priv;
+	ocf_cache_t cache = mngt_ctx->cache;
 	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 
 	ocf_volume_close(cache_ctx->cache_att_cfg.device.volume);
 
 	if (error && error != -OCF_ERR_NO_METADATA) {
 		SPDK_ERRLOG("OCF cache '%s': failed to probe metadata\n", ocf_cache_get_name(cache));
-		ctx->u.att_cb_fn(cache, ctx, error);
+		mngt_ctx->u.att_cb_fn(cache, mngt_ctx, error);
 	}
 
 	if (error == -OCF_ERR_NO_METADATA) {
 		SPDK_NOTICELOG("OCF cache '%s': metadata not found - starting new cache instance\n",
 			       ocf_cache_get_name(cache));
-		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, mngt_ctx->u.att_cb_fn, mngt_ctx);
 	} else {
 		SPDK_NOTICELOG("OCF cache '%s': metadata found - loading previous cache instance\n",
 			       ocf_cache_get_name(cache));
 		SPDK_NOTICELOG("(start cache with 'no-load' flag to create new cache instead of loading config from metadata)\n");
 		// check status for cache_name/mode/line_size/dirty ?
-		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
+		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, mngt_ctx->u.att_cb_fn, mngt_ctx);
 	}
 }
 
 int
-vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *ctx)
+vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *mngt_ctx)
 {
 	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 	int rc;
 
 	if (cache_ctx->no_load) {
 		SPDK_NOTICELOG("'no-load' flag specified - starting new cache without looking for metadata\n");
-		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, ctx->u.att_cb_fn, ctx);
+		ocf_mngt_cache_attach(cache, &cache_ctx->cache_att_cfg, mngt_ctx->u.att_cb_fn, mngt_ctx);
 		return 0;
 	}
 
@@ -271,7 +277,7 @@ vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *ctx)
 	}
 
 	ocf_metadata_probe(vbdev_ocf_ctx, cache_ctx->cache_att_cfg.device.volume,
-			   _volume_attach_metadata_probe_cb, ctx);
+			   _volume_attach_metadata_probe_cb, mngt_ctx);
 
 	return 0;
 }
@@ -349,26 +355,3 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 
 	return rc;
 }
-
-bool
-vbdev_ocf_cache_is_base_attached(ocf_cache_t cache)
-{
-	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
-
-	return cache_ctx->base.attached;
-}
-
-//bool
-//vbdev_ocf_any_cache_started(void)
-//{
-//	/* OCF context is created with refcount set to 1 and any started cache
-//	 * will increment it further. So, if context refcount equals 1, it means
-//	 * that it's just created without any started caches. */
-//	//return (ocf_ctx_get_refcnt(vbdev_ocf_ctx) > 1) ? true : false;
-//
-//	int refcnt;
-//
-//	refcnt = ocf_ctx_get_refcnt(vbdev_ocf_ctx);
-//	printf("*** CTX refcnt: %d\n", refcnt);
-//	return (refcnt > 1) ? true : false;
-//}

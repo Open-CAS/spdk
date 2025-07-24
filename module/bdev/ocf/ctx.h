@@ -15,7 +15,6 @@ extern ocf_ctx_t vbdev_ocf_ctx;
 
 #define SPDK_OBJECT 1
 
-// why?
 #define VBDEV_OCF_QUEUE_RUN_MAX 32
 
 int vbdev_ocf_ctx_init(void);

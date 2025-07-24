@@ -151,17 +151,16 @@ def add_parser(subparsers):
                                               core_name=args.core_name,
                                               base_name=args.base_name,
                                               cache_name=args.cache_name))
-    p = subparsers.add_parser('bdev_ocf_add_core', help='Add core device to OCF cache')
+    p = subparsers.add_parser('bdev_ocf_add_core', help='Add core (backend device) to OCF cache')
     p.add_argument('core_name', help='name for the new OCF core vbdev')
     p.add_argument('base_name', help='name of the base bdev to use as core')
     p.add_argument('cache_name', help='name of already started OCF cache vbdev')
     p.set_defaults(func=bdev_ocf_add_core)
 
     def bdev_ocf_remove_core(args):
-        args.client.bdev_ocf_remove_core(core_name=args.core_name, cache_name=args.cache_name)
-    p = subparsers.add_parser('bdev_ocf_remove_core', help='Remove core device from OCF cache')
+        args.client.bdev_ocf_remove_core(core_name=args.core_name)
+    p = subparsers.add_parser('bdev_ocf_remove_core', help='Remove core (backend device) from OCF cache')
     p.add_argument('core_name', help='name of the core vbdev to remove from OCF cache instance')
-    p.add_argument('cache_name', help='name of the cache vbdev to remove core from')
     p.set_defaults(func=bdev_ocf_remove_core)
 
     def bdev_ocf_set_cachemode(args):
@@ -181,7 +180,7 @@ def add_parser(subparsers):
                                         policy=args.policy,
                                         nhit_insertion_threshold=args.nhit_insertion_threshold,
                                         nhit_trigger_threshold=args.nhit_trigger_threshold)
-    p = subparsers.add_parser('bdev_ocf_set_promotion', help='Set promotion parameters for OCF cache device')
+    p = subparsers.add_parser('bdev_ocf_set_promotion', help='Set promotion parameters for OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
                    help='promotion policy (choose between {always|nhit})',
@@ -208,7 +207,7 @@ def add_parser(subparsers):
                                        alru_staleness_time=args.alru_staleness_time,
                                        alru_activity_threshold=args.alru_activity_threshold,
                                        alru_max_dirty_ratio=args.alru_max_dirty_ratio)
-    p = subparsers.add_parser('bdev_ocf_set_cleaning', help='Set cleaning parameters for OCF cache device')
+    p = subparsers.add_parser('bdev_ocf_set_cleaning', help='Set cleaning parameters for OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
                    help='cleaning policy (choose between {acp|alru|nop})',
@@ -251,7 +250,7 @@ def add_parser(subparsers):
                                         threshold=args.threshold,
                                         promotion_count=args.promotion_count,
                                         promote_on_threshold=args.promote_on_threshold)
-    p = subparsers.add_parser('bdev_ocf_set_seqcutoff', help='Set sequential cut-off parameters for OCF core device or all cores in given cache')
+    p = subparsers.add_parser('bdev_ocf_set_seqcutoff', help='Set sequential cut-off parameters for OCF core or all cores in given cache')
     p.add_argument('bdev_name', help='name of OCF vbdev')
     p.add_argument('-p', '--policy',
                    help='sequential cut-off policy (choose between {always|full|never})',
@@ -291,9 +290,9 @@ def add_parser(subparsers):
     p.set_defaults(func=bdev_ocf_reset_stats)
 
     def bdev_ocf_get_bdevs(args):
-        print_dict(args.client.bdev_ocf_get_bdevs(name=args.name))
-    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get info about OCF devices')
-    p.add_argument('name', nargs='?', help='optional name of specific OCF vbdev; shows all by default')
+        print_dict(args.client.bdev_ocf_get_bdevs(bdev_name=args.bdev_name))
+    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get info about OCF vbdevs')
+    p.add_argument('bdev_name', nargs='?', help='optional name of specific OCF vbdev (shows all by default)')
     p.set_defaults(func=bdev_ocf_get_bdevs)
 
     def bdev_malloc_create(args):

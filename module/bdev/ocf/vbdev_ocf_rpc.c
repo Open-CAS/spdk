@@ -628,15 +628,102 @@ cleanup:
 }
 SPDK_RPC_REGISTER("bdev_ocf_flush_start", rpc_bdev_ocf_flush_start, SPDK_RPC_RUNTIME)
 
+struct rpc_bdev_ocf_get_stats {
+	char *bdev_name;
+};
+
+static void
+free_rpc_bdev_ocf_get_stats(struct rpc_bdev_ocf_get_stats *r)
+{
+	free(r->bdev_name);
+}
+
+static const struct spdk_json_object_decoder rpc_bdev_ocf_get_stats_decoders[] = {
+	{"bdev_name", offsetof(struct rpc_bdev_ocf_get_stats, bdev_name), spdk_json_decode_string},
+};
+
+static void
+rpc_bdev_ocf_get_stats_cb(void *cb_arg1, void *cb_arg2)
+{
+	struct spdk_json_write_ctx *w = cb_arg1;
+	struct spdk_jsonrpc_request *request = cb_arg2;
+
+	spdk_json_write_object_end(w);
+	spdk_jsonrpc_end_result(request, w);
+}
+
 static void
 rpc_bdev_ocf_get_stats(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
+	struct rpc_bdev_ocf_get_stats req = {};
+	struct spdk_json_write_ctx *w;
+
+	if (spdk_json_decode_object(params, rpc_bdev_ocf_get_stats_decoders,
+				    SPDK_COUNTOF(rpc_bdev_ocf_get_stats_decoders),
+				    &req)) {
+		SPDK_DEBUGLOG(vbdev_ocf_rpc, "spdk_json_decode_object failed\n");
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto cleanup;
+	}
+
+	w = spdk_jsonrpc_begin_result(request);
+	spdk_json_write_object_begin(w);
+
+	vbdev_ocf_get_stats(req.bdev_name, rpc_bdev_ocf_get_stats_cb, w, request);
+
+cleanup:
+	free_rpc_bdev_ocf_get_stats(&req);
 }
 SPDK_RPC_REGISTER("bdev_ocf_get_stats", rpc_bdev_ocf_get_stats, SPDK_RPC_RUNTIME)
+
+struct rpc_bdev_ocf_reset_stats {
+	char *bdev_name;
+};
+
+static void
+free_rpc_bdev_ocf_reset_stats(struct rpc_bdev_ocf_reset_stats *r)
+{
+	free(r->bdev_name);
+}
+
+static const struct spdk_json_object_decoder rpc_bdev_ocf_reset_stats_decoders[] = {
+	{"bdev_name", offsetof(struct rpc_bdev_ocf_reset_stats, bdev_name), spdk_json_decode_string},
+};
+
+static void
+rpc_bdev_ocf_reset_stats_cb(const char *bdev_name, void *cb_arg, int error)
+{
+	struct spdk_jsonrpc_request *request = cb_arg;
+
+	if (error) {
+		spdk_jsonrpc_send_error_response_fmt(request, error,
+						     "Failed to reset statistics on OCF cache or core '%s': %s",
+						     bdev_name, spdk_strerror(-error));
+		return;
+	}
+
+	spdk_jsonrpc_send_bool_response(request, true);
+}
 
 static void
 rpc_bdev_ocf_reset_stats(struct spdk_jsonrpc_request *request, const struct spdk_json_val *params)
 {
+	struct rpc_bdev_ocf_reset_stats req = {};
+
+	if (spdk_json_decode_object(params, rpc_bdev_ocf_reset_stats_decoders,
+				    SPDK_COUNTOF(rpc_bdev_ocf_reset_stats_decoders),
+				    &req)) {
+		SPDK_DEBUGLOG(vbdev_ocf_rpc, "spdk_json_decode_object failed\n");
+		spdk_jsonrpc_send_error_response(request, SPDK_JSONRPC_ERROR_INVALID_PARAMS,
+						 "Invalid parameters");
+		goto cleanup;
+	}
+
+	vbdev_ocf_reset_stats(req.bdev_name, rpc_bdev_ocf_reset_stats_cb, request);
+
+cleanup:
+	free_rpc_bdev_ocf_reset_stats(&req);
 }
 SPDK_RPC_REGISTER("bdev_ocf_reset_stats", rpc_bdev_ocf_reset_stats, SPDK_RPC_RUNTIME)
 

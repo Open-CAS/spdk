@@ -74,6 +74,15 @@ void vbdev_ocf_flush_start(const char *bdev_name,
 			   vbdev_ocf_rpc_mngt_cb rpc_cb_fn,
 			   void *rpc_cb_arg);
 
+void vbdev_ocf_get_stats(const char *bdev_name,
+			 vbdev_ocf_get_bdevs_cb rpc_cb_fn,
+			 void *rpc_cb_arg1,
+			 void *rpc_cb_arg2);
+
+void vbdev_ocf_reset_stats(const char *bdev_name,
+			   vbdev_ocf_rpc_mngt_cb rpc_cb_fn,
+			   void *rpc_cb_arg);
+
 void vbdev_ocf_get_bdevs(const char *bdev_name,
 			 vbdev_ocf_get_bdevs_cb rpc_cb_fn,
 			 void *rpc_cb_arg1,

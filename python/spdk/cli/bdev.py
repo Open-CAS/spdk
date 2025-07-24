@@ -278,15 +278,15 @@ def add_parser(subparsers):
     p.set_defaults(func=bdev_ocf_flush_start)
 
     def bdev_ocf_get_stats(args):
-        print_dict(args.client.bdev_ocf_get_stats(name=args.name))
-    p = subparsers.add_parser('bdev_ocf_get_stats', help='Get statistics of chosen OCF block device')
-    p.add_argument('name', help='Name of OCF bdev')
+        print_dict(args.client.bdev_ocf_get_stats(bdev_name=args.bdev_name))
+    p = subparsers.add_parser('bdev_ocf_get_stats', help='Get statistics of OCF vbdev')
+    p.add_argument('bdev_name', help='name of OCF vbdev')
     p.set_defaults(func=bdev_ocf_get_stats)
 
     def bdev_ocf_reset_stats(args):
-        print_dict(args.client.bdev_ocf_reset_stats(name=args.name))
-    p = subparsers.add_parser('bdev_ocf_reset_stats', help='Reset statistics of chosen OCF block device')
-    p.add_argument('name', help='Name of OCF bdev')
+        args.client.bdev_ocf_reset_stats(bdev_name=args.bdev_name)
+    p = subparsers.add_parser('bdev_ocf_reset_stats', help='Reset statistics of OCF vbdev')
+    p.add_argument('bdev_name', help='name of OCF vbdev')
     p.set_defaults(func=bdev_ocf_reset_stats)
 
     def bdev_ocf_get_bdevs(args):

@@ -11,6 +11,7 @@
 #include "vbdev_ocf.h"
 #include "ctx.h"
 #include "data.h"
+#include "stats.h"
 #include "utils.h"
 #include "volume.h"
 
@@ -2351,6 +2352,142 @@ vbdev_ocf_flush_start(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 				 _flush_lock_cb, mngt_ctx);
 }
 
+// TODO: read lock cache
+/* RPC entry point. */
+void
+vbdev_ocf_get_stats(const char *bdev_name, vbdev_ocf_get_bdevs_cb rpc_cb_fn,
+		    void *rpc_cb_arg1, void *rpc_cb_arg2)
+{
+	struct spdk_json_write_ctx *w = rpc_cb_arg1;
+	ocf_cache_t cache;
+	ocf_core_t core;
+	struct vbdev_ocf_mngt_ctx *mngt_ctx;
+	struct vbdev_ocf_stats stats;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': getting statistics\n", bdev_name);
+
+	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!mngt_ctx) {
+		SPDK_ERRLOG("OCF '%s': failed to allocate memory for getting statistics context\n",
+			    bdev_name);
+		goto end;
+	}
+	mngt_ctx->bdev_name = bdev_name;
+	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
+	mngt_ctx->cache = NULL;
+	mngt_ctx->core = NULL;
+
+	if ((rc = vbdev_ocf_bdev_resolve(mngt_ctx))) {
+		SPDK_ERRLOG("OCF '%s': failed to find cache or core of that name: %s\n",
+			    bdev_name, spdk_strerror(-rc));
+		free(mngt_ctx);
+		goto end;
+	}
+	cache = mngt_ctx->cache;
+	core = mngt_ctx->core;
+	free(mngt_ctx);
+
+	if (core) {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': collecting statistics\n", ocf_core_get_name(core));
+
+		if ((rc = vbdev_ocf_stats_core_get(core, &stats))) {
+			SPDK_ERRLOG("OCF core '%s': failed to collect statistics (OCF error: %d)\n",
+				    ocf_core_get_name(core), rc);
+			goto end;
+		}
+	} else {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': collecting statistics\n", ocf_cache_get_name(cache));
+
+		if ((rc = vbdev_ocf_stats_cache_get(cache, &stats))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to collect statistics (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto end;
+		}
+	}
+
+	vbdev_ocf_stats_write_json(w, &stats);
+
+end:
+	rpc_cb_fn(rpc_cb_arg1, rpc_cb_arg2);
+}
+
+static void
+_reset_stats_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx = cb_arg;
+	ocf_core_t core = mngt_ctx->core;
+	int rc;
+
+	if ((rc = error)) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		goto end;
+	}
+
+	if (core) {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': stats reset\n", ocf_core_get_name(core));
+
+		if ((rc = vbdev_ocf_stats_core_reset(core))) {
+		SPDK_ERRLOG("OCF core '%s': failed to reset statistics (OCF error: %d)\n",
+			    ocf_core_get_name(core), rc);
+		}
+	} else {
+		SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': stats reset\n", ocf_cache_get_name(cache));
+
+		if ((rc = vbdev_ocf_stats_cache_reset(cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to reset statistics (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), rc);
+		}
+	}
+
+	ocf_mngt_cache_unlock(cache);
+
+end:
+	mngt_ctx->rpc_cb_fn(mngt_ctx->bdev_name, mngt_ctx->rpc_cb_arg, rc);
+	free(mngt_ctx);
+}
+
+/* RPC entry point. */
+void
+vbdev_ocf_reset_stats(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+{
+	struct vbdev_ocf_mngt_ctx *mngt_ctx;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': resetting statistics\n", bdev_name);
+
+	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
+	if (!mngt_ctx) {
+		SPDK_ERRLOG("OCF '%s': failed to allocate memory for resetting statistics context\n",
+			    bdev_name);
+		rc = -ENOMEM;
+		goto err_alloc;
+	}
+	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
+	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
+	mngt_ctx->bdev_name = bdev_name;
+	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
+	mngt_ctx->cache = NULL;
+	mngt_ctx->core = NULL;
+
+	if ((rc = vbdev_ocf_bdev_resolve(mngt_ctx))) {
+		SPDK_ERRLOG("OCF '%s': failed to find cache or core of that name: %s\n",
+			    bdev_name, spdk_strerror(-rc));
+		goto err_resolve;
+	}
+
+	ocf_mngt_cache_lock(mngt_ctx->cache ? : ocf_core_get_cache(mngt_ctx->core),
+			    _reset_stats_lock_cb, mngt_ctx);
+
+	return;
+
+err_resolve:
+	free(mngt_ctx);
+err_alloc:
+	rpc_cb_fn(bdev_name, rpc_cb_arg, rc);
+}
+
 static int
 dump_promotion_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
 {
@@ -2615,6 +2752,7 @@ _get_bdevs_cache_visitor(ocf_cache_t cache, void *cb_arg)
 	return rc;
 }
 
+// TODO: read lock cache ?
 /* RPC entry point. */
 void
 vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_get_bdevs_cb rpc_cb_fn, void *rpc_cb_arg1, void *rpc_cb_arg2)

@@ -240,10 +240,16 @@ _core_io_queue_stop(void *ctx)
 	struct vbdev_ocf_core_io_channel_ctx *ch_ctx = ctx;
 
 	spdk_poller_unregister(&ch_ctx->poller);
+
 	if (ch_ctx->cache_ch) {
 		spdk_put_io_channel(ch_ctx->cache_ch);
 	}
-	spdk_put_io_channel(ch_ctx->core_ch);
+
+	/* Core channel may not exist only on error path. */
+	if (likely(ch_ctx->core_ch)) {
+		spdk_put_io_channel(ch_ctx->core_ch);
+	}
+
 	free(ch_ctx);
 }
 
@@ -251,12 +257,21 @@ static void
 vbdev_ocf_core_io_queue_stop(ocf_queue_t queue)
 {
 	struct vbdev_ocf_core_io_channel_ctx *ch_ctx = ocf_queue_get_priv(queue);
+	struct spdk_bdev *ocf_vbdev = &((struct vbdev_ocf_core *)ocf_core_get_priv(ch_ctx->core))->ocf_vbdev;
+	int rc;
 	
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': deallocating external IO channel context\n",
-		      spdk_bdev_get_name(&((struct vbdev_ocf_core *)ocf_core_get_priv(ch_ctx->core))->ocf_vbdev));
+		      spdk_bdev_get_name(ocf_vbdev));
 
 	if (ch_ctx->thread && ch_ctx->thread != spdk_get_thread()) {
-		spdk_thread_send_msg(ch_ctx->thread, _core_io_queue_stop, ch_ctx);
+		if ((rc = spdk_thread_send_msg(ch_ctx->thread, _core_io_queue_stop, ch_ctx))) {
+			SPDK_ERRLOG("OCF vbdev '%s': failed to send message to thread (name: %s, id: %ld): %s\n",
+				    spdk_bdev_get_name(ocf_vbdev),
+				    spdk_thread_get_name(ch_ctx->thread),
+				    spdk_thread_get_id(ch_ctx->thread),
+				    spdk_strerror(-rc));
+			assert(false);
+		}
 	} else {
 		_core_io_queue_stop(ch_ctx);
 	}
@@ -300,6 +315,8 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 			    vbdev_name);
 		return -ENOMEM;
 	}
+	ch_ctx->core = core; // keep? (only for DEBUGLOG)
+	ch_ctx->thread = spdk_get_thread();
 
 	if ((rc = ocf_queue_create(cache, &ch_ctx->queue, &core_io_queue_ops))) {
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create OCF queue\n", vbdev_name);
@@ -307,6 +324,10 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 		return rc;
 	}
 	ocf_queue_set_priv(ch_ctx->queue, ch_ctx);
+	/* Save queue pointer in buffer provided by the IO channel callback.
+	 * Only this will be needed in channel destroy callback to decrement
+	 * the refcount. The rest is freed in queue stop callback. */
+	ch_destroy_ctx->queue = ch_ctx->queue;
 
 	if (!ocf_cache_is_detached(cache)) {
 		ch_ctx->cache_ch = spdk_bdev_get_io_channel(cache_base->desc);
@@ -322,7 +343,8 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 	if (!ch_ctx->core_ch) {
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create IO channel for base bdev '%s'\n",
 			    vbdev_name, spdk_bdev_get_name(core_base->bdev));
-		spdk_put_io_channel(ch_ctx->cache_ch);
+		/* Do not spdk_put_io_channel() here as it
+		 * will be done during stop of OCF queue. */
 		ocf_queue_put(ch_ctx->queue);
 		return -ENOMEM;
 	}
@@ -330,19 +352,11 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 	ch_ctx->poller = SPDK_POLLER_REGISTER(vbdev_ocf_queue_poller, ch_ctx->queue, 0);
 	if (!ch_ctx->poller) {
 		SPDK_ERRLOG("OCF vbdev '%s': failed to create IO queue poller\n", vbdev_name);
-		spdk_put_io_channel(ch_ctx->core_ch);
-		spdk_put_io_channel(ch_ctx->cache_ch);
+		/* Do not spdk_put_io_channel() here as it
+		 * will be done during stop of OCF queue. */
 		ocf_queue_put(ch_ctx->queue);
 		return -ENOMEM;
 	}
-
-	ch_ctx->core = core; // keep? (only for DEBUGLOG)
-	ch_ctx->thread = spdk_get_thread();
-
-	/* Save queue pointer in buffer provided by the IO channel callback.
-	 * Only this will be needed in channel destroy callback to decrement
-	 * the refcount. The rest is freed in queue stop callback. */
-	ch_destroy_ctx->queue = ch_ctx->queue;
 
 	return rc;
 }
@@ -498,4 +512,123 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 
 		ocf_mngt_cache_lock(cache, _core_add_from_waitlist_lock_cb, core_ctx);
 	}
+}
+
+static void
+_create_cache_ch_cb(struct spdk_io_channel_iter *i, int error)
+{
+	ocf_core_t core = spdk_io_channel_iter_get_io_device(i);
+
+	if (error) {
+		SPDK_ERRLOG("OCF core '%s': failed to create cache IO channels: %s\n",
+			    ocf_core_get_name(core), spdk_strerror(-error));
+		return;
+	}
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': all cache IO channels created\n",
+		      ocf_core_get_name(core));
+}
+
+static void
+_create_cache_ch_fn(struct spdk_io_channel_iter *i)
+{
+	ocf_cache_t cache = spdk_io_channel_iter_get_ctx(i);
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+	struct vbdev_ocf_core_io_channel_ctx *ch_ctx, *queue_ch_ctx;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s' on channel %p: creating cache IO channel\n",
+		      ocf_core_get_name(spdk_io_channel_iter_get_io_device(i)),
+		      spdk_io_channel_iter_get_channel(i));
+
+	/* The actual IO channel context is saved in queue priv.
+	 * The one saved in channel context buffer is used only
+	 * to properly destroy the channel.
+	 * (See the comment in _vbdev_ocf_ch_create_cb() in vbdev_ocf_core.c
+	 * for more details.) */
+	ch_ctx = spdk_io_channel_get_ctx(spdk_io_channel_iter_get_channel(i));
+	queue_ch_ctx = ocf_queue_get_priv(ch_ctx->queue);
+
+	/* Cache device IO channel should not exist at this point.
+	 * It should be cleaned after cache device detach (either
+	 * manual or hot removed) or not initialized after starting
+	 * cache without device present. */
+	assert(!queue_ch_ctx->cache_ch);
+
+	queue_ch_ctx->cache_ch = spdk_bdev_get_io_channel(cache_ctx->base.desc);
+
+	spdk_for_each_channel_continue(i, 0);
+}
+
+static int
+_create_cache_ch_core_visitor(ocf_core_t core, void *ctx)
+{
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': creating all cache IO channels\n",
+		      ocf_core_get_name(core));
+
+	spdk_for_each_channel(core, _create_cache_ch_fn, ctx, _create_cache_ch_cb);
+
+	return 0;
+}
+
+int
+vbdev_ocf_core_create_cache_channel(ocf_cache_t cache)
+{
+	return ocf_core_visit(cache, _create_cache_ch_core_visitor, cache, true);
+}
+
+static void
+_destroy_cache_ch_cb(struct spdk_io_channel_iter *i, int error)
+{
+	ocf_core_t core = spdk_io_channel_iter_get_io_device(i);
+
+	if (error) {
+		SPDK_ERRLOG("OCF core '%s': failed to destroy cache IO channels: %s\n",
+			    ocf_core_get_name(core), spdk_strerror(-error));
+		return;
+	}
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': all cache IO channels destroyed\n",
+		      ocf_core_get_name(core));
+}
+
+static void
+_destroy_cache_ch_fn(struct spdk_io_channel_iter *i)
+{
+	struct vbdev_ocf_core_io_channel_ctx *ch_ctx, *queue_ch_ctx;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s' on channel %p: destroying cache IO channel\n",
+		      ocf_core_get_name(spdk_io_channel_iter_get_io_device(i)),
+		      spdk_io_channel_iter_get_channel(i));
+
+	/* The actual IO channel context is saved in queue priv.
+	 * The one saved in channel context buffer is used only
+	 * to properly destroy the channel.
+	 * (See the comment in _vbdev_ocf_ch_create_cb() in vbdev_ocf_core.c
+	 * for more details.) */
+	ch_ctx = spdk_io_channel_get_ctx(spdk_io_channel_iter_get_channel(i));
+	queue_ch_ctx = ocf_queue_get_priv(ch_ctx->queue);
+
+	assert(queue_ch_ctx->cache_ch);
+
+	spdk_put_io_channel(queue_ch_ctx->cache_ch);
+	queue_ch_ctx->cache_ch = NULL;
+
+	spdk_for_each_channel_continue(i, 0);
+}
+
+static int
+_destroy_cache_ch_core_visitor(ocf_core_t core, void *ctx)
+{
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': destroying all cache IO channels\n",
+		      ocf_core_get_name(core));
+
+	spdk_for_each_channel(core, _destroy_cache_ch_fn, ctx, _destroy_cache_ch_cb);
+
+	return 0;
+}
+
+int
+vbdev_ocf_core_destroy_cache_channel(ocf_cache_t cache)
+{
+	return ocf_core_visit(cache, _destroy_cache_ch_core_visitor, NULL, true);
 }

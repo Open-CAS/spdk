@@ -118,4 +118,10 @@ int vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregis
 /* Add all cores from wait list assigned to given cache. */
 void vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache);
 
+/* Create new cache IO channel on all opened channels context for each opened core. */
+int vbdev_ocf_core_create_cache_channel(ocf_cache_t cache);
+
+/* Destroy cache IO channel on all opened channels context for each opened core. */
+int vbdev_ocf_core_destroy_cache_channel(ocf_cache_t cache);
+
 #endif

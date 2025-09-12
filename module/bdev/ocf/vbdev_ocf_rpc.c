@@ -39,8 +39,8 @@ rpc_bdev_ocf_start_cache_cb(const char *bdev_name, void *cb_arg, int error)
 
 	if (error && error != -ENODEV) {
 		spdk_jsonrpc_send_error_response_fmt(request, error,
-						     "Failed to start OCF cache '%s': %s",
-						     bdev_name, spdk_strerror(-error));
+						     "Failed to start OCF cache: %s",
+						     spdk_strerror(-error));
 		return;
 	}
 

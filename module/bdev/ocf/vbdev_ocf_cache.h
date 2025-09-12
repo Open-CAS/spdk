@@ -145,4 +145,7 @@ int vbdev_ocf_cache_volume_attach(ocf_cache_t cache, struct vbdev_ocf_mngt_ctx *
 /* Create cache management queue poller. */
 int vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache);
 
+/* Decrement refcount on cache management queue. */
+void vbdev_ocf_cache_mngt_queue_put(ocf_cache_t cache);
+
 #endif

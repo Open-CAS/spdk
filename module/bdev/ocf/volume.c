@@ -8,8 +8,9 @@
 
 #include "spdk/bdev_module.h"
 #include "spdk/env.h"
-#include "spdk/thread.h"
 #include "spdk/log.h"
+#include "spdk/string.h"
+#include "spdk/thread.h"
 
 #include "vbdev_ocf_core.h"
 #include "data.h"
@@ -212,10 +213,8 @@ vbdev_forward_flush(ocf_volume_t volume, ocf_forward_token_t token)
 	uint64_t bytes = base->bdev->blockcnt * base->bdev->blocklen;
 	int status;
 
-	// workaround (?); check for better solution
-	/* If base device doesn't support flush just warn about it and exit. */
+	/* If base device doesn't support flush just ignore it and exit. */
 	if (unlikely(!spdk_bdev_io_type_supported(base->bdev, SPDK_BDEV_IO_TYPE_FLUSH))) {
-		SPDK_WARNLOG("Base bdev '%s': attempt to flush device that doesn't support it\n", base->bdev->name);
 		ocf_forward_end(token, 0);
 		return;
 	}
@@ -356,8 +355,17 @@ _base_detach(void *ctx)
 void
 vbdev_ocf_base_detach(struct vbdev_ocf_base *base)
 {
+	int rc;
+
 	if (base->thread && base->thread != spdk_get_thread()) {
-		spdk_thread_send_msg(base->thread, _base_detach, base);
+		if ((rc = spdk_thread_send_msg(base->thread, _base_detach, base))) {
+			SPDK_ERRLOG("OCF '%s': failed to send message to thread (name: %s, id: %ld): %s\n",
+				    base->name,
+				    spdk_thread_get_name(base->thread),
+				    spdk_thread_get_id(base->thread),
+				    spdk_strerror(-rc));
+			assert(false);
+		}
 	} else {
 		_base_detach(base);
 	}

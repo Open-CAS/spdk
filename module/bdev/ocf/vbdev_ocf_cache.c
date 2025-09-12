@@ -3,6 +3,8 @@
  *   All rights reserved.
  */
 
+#include "spdk/string.h"
+
 #include "vbdev_ocf_cache.h"
 #include "ctx.h"
 #include "utils.h"
@@ -71,6 +73,8 @@ vbdev_ocf_cache_destroy(ocf_cache_t cache)
 	free(cache_ctx);
 }
 
+int vbdev_ocf_core_destroy_cache_channel(ocf_cache_t cache);
+
 static void
 _cache_hotremove_detach_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
@@ -91,8 +95,12 @@ _cache_hotremove_detach_cb(ocf_cache_t cache, void *cb_arg, int error)
 	SPDK_NOTICELOG("OCF cache '%s': device detached\n", ocf_cache_get_name(cache));
 
 	vbdev_ocf_cache_base_detach(cache);
-	/* Increment queue refcount to prevent destroying management queue after cache device detach. */
-	ocf_queue_get(((struct vbdev_ocf_cache *)ocf_cache_get_priv(cache))->cache_mngt_q);
+
+	/* Update cache IO channel after device detach. */
+	if ((error = vbdev_ocf_core_destroy_cache_channel(cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to destroy channel for detached cache: %s\n",
+			    ocf_cache_get_name(cache), spdk_strerror(-error));
+	}
 }
 
 static void
@@ -254,7 +262,6 @@ _volume_attach_metadata_probe_cb(void *priv, int error, struct ocf_metadata_prob
 		SPDK_NOTICELOG("OCF cache '%s': metadata found - loading previous cache instance\n",
 			       ocf_cache_get_name(cache));
 		SPDK_NOTICELOG("(start cache with 'no-load' flag to create new cache instead of loading config from metadata)\n");
-		// check status for cache_name/mode/line_size/dirty ?
 		ocf_mngt_cache_load(cache, &cache_ctx->cache_att_cfg, mngt_ctx->u.att_cb_fn, mngt_ctx);
 	}
 }
@@ -295,12 +302,20 @@ static void
 vbdev_ocf_cache_mngt_queue_stop(ocf_queue_t queue)
 {
 	struct vbdev_ocf_cache_mngt_queue_ctx *mngt_q_ctx = ocf_queue_get_priv(queue);
+	int rc;
 	
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': destroying OCF management queue\n",
 		      ocf_cache_get_name(mngt_q_ctx->cache));
 
 	if (mngt_q_ctx->thread && mngt_q_ctx->thread != spdk_get_thread()) {
-		spdk_thread_send_msg(mngt_q_ctx->thread, _cache_mngt_queue_stop, mngt_q_ctx);
+		if ((rc = spdk_thread_send_msg(mngt_q_ctx->thread, _cache_mngt_queue_stop, mngt_q_ctx))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to send message to thread (name: %s, id: %ld): %s\n",
+				    ocf_cache_get_name(mngt_q_ctx->cache),
+				    spdk_thread_get_name(mngt_q_ctx->thread),
+				    spdk_thread_get_id(mngt_q_ctx->thread),
+				    spdk_strerror(-rc));
+			assert(false);
+		}
 	} else {
 		_cache_mngt_queue_stop(mngt_q_ctx);
 	}
@@ -333,6 +348,8 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 			    ocf_cache_get_name(cache));
 		return -ENOMEM;
 	}
+	mngt_q_ctx->cache = cache; // keep? (only for DEBUGLOG)
+	mngt_q_ctx->thread = spdk_get_thread();
 
 	if ((rc = ocf_queue_create_mngt(cache, &cache_ctx->cache_mngt_q, &cache_mngt_queue_ops))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to create OCF management queue\n",
@@ -350,8 +367,13 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 		return -ENOMEM;
 	}
 
-	mngt_q_ctx->cache = cache; // keep? (only for DEBUGLOG)
-	mngt_q_ctx->thread = spdk_get_thread();
-
 	return rc;
+}
+
+void
+vbdev_ocf_cache_mngt_queue_put(ocf_cache_t cache)
+{
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	vbdev_ocf_queue_put(cache_ctx->cache_mngt_q);
 }

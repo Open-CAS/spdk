@@ -24,16 +24,18 @@ static void vbdev_ocf_module_fini(void);
 static int vbdev_ocf_module_get_ctx_size(void);
 static void vbdev_ocf_module_examine_config(struct spdk_bdev *bdev);
 static void vbdev_ocf_module_examine_disk(struct spdk_bdev *bdev);
+static int vbdev_ocf_module_config_json(struct spdk_json_write_ctx *w);
 
 struct spdk_bdev_module ocf_if = {
 	.name = "OCF",
 	.module_init = vbdev_ocf_module_init,
 	.fini_start = vbdev_ocf_module_fini_start,
+	.async_fini_start = true,
 	.module_fini = vbdev_ocf_module_fini,
 	.get_ctx_size = vbdev_ocf_module_get_ctx_size,
 	.examine_config = vbdev_ocf_module_examine_config,
 	.examine_disk = vbdev_ocf_module_examine_disk,
-	.async_fini_start = true,
+	.config_json = vbdev_ocf_module_config_json,
 };
 SPDK_BDEV_MODULE_REGISTER(ocf, &ocf_if)
 
@@ -42,7 +44,8 @@ static void vbdev_ocf_fn_submit_request(struct spdk_io_channel *ch, struct spdk_
 static bool vbdev_ocf_fn_io_type_supported(void *ctx, enum spdk_bdev_io_type);
 static struct spdk_io_channel *vbdev_ocf_fn_get_io_channel(void *ctx);
 static int vbdev_ocf_fn_dump_info_json(void *ctx, struct spdk_json_write_ctx *w);
-static void vbdev_ocf_fn_write_config_json(struct spdk_bdev *bdev, struct spdk_json_write_ctx *w);
+static void vbdev_ocf_fn_dump_device_stat_json(void *ctx, struct spdk_json_write_ctx *w);
+static void vbdev_ocf_fn_reset_device_stat(void *ctx);
 
 struct spdk_bdev_fn_table vbdev_ocf_fn_table = {
 	.destruct = vbdev_ocf_fn_destruct,
@@ -50,9 +53,8 @@ struct spdk_bdev_fn_table vbdev_ocf_fn_table = {
 	.io_type_supported = vbdev_ocf_fn_io_type_supported,
 	.get_io_channel = vbdev_ocf_fn_get_io_channel,
 	.dump_info_json = vbdev_ocf_fn_dump_info_json,
-	.write_config_json = vbdev_ocf_fn_write_config_json,
-	.dump_device_stat_json = NULL, // todo ?
-	.reset_device_stat = NULL, // todo ?
+	.dump_device_stat_json = vbdev_ocf_fn_dump_device_stat_json,
+	.reset_device_stat = vbdev_ocf_fn_reset_device_stat,
 };
 
 static int
@@ -767,6 +769,91 @@ vbdev_ocf_module_examine_disk(struct spdk_bdev *bdev)
 }
 
 static void
+dump_core_config(struct spdk_json_write_ctx *w, struct vbdev_ocf_core *core_ctx)
+{
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_string(w, "method", "bdev_ocf_add_core");
+
+	spdk_json_write_named_object_begin(w, "params");
+	spdk_json_write_named_string(w, "core_name", vbdev_ocf_core_get_name(core_ctx));
+	spdk_json_write_named_string(w, "base_name", core_ctx->base.name);
+	spdk_json_write_named_string(w, "cache_name", core_ctx->cache_name);
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+}
+
+static void
+dump_cache_config(struct spdk_json_write_ctx *w, ocf_cache_t cache)
+{
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	spdk_json_write_object_begin(w);
+	spdk_json_write_named_string(w, "method", "bdev_ocf_start_cache");
+
+	spdk_json_write_named_object_begin(w, "params");
+	spdk_json_write_named_string(w, "cache_name", ocf_cache_get_name(cache));
+	spdk_json_write_named_string(w, "base_name", cache_ctx->base.name);
+	spdk_json_write_named_string(w, "cache_mode",
+				     vbdev_ocf_cachemode_get_name(ocf_cache_get_mode(cache)));
+	spdk_json_write_named_uint32(w, "cache_line_size", ocf_cache_get_line_size(cache));
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+}
+
+static int
+_module_config_json_core_visitor(ocf_core_t core, void *ctx)
+{
+	struct spdk_json_write_ctx *w = ctx;
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': module config visit\n", ocf_core_get_name(core));
+
+	if (!core_ctx) {
+		/* Skip this core. If there is no context, it means that this core
+		 * was added from metadata during cache load and not manually by RPC call. */
+		return 0;
+	}
+
+	dump_core_config(w, core_ctx);
+
+	return 0;
+}
+
+static int
+_module_config_json_cache_visitor(ocf_cache_t cache, void *ctx)
+{
+	struct spdk_json_write_ctx *w = ctx;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': module config visit\n", ocf_cache_get_name(cache));
+
+	dump_cache_config(w, cache);
+
+	return ocf_core_visit(cache, _module_config_json_core_visitor, w, false);
+}
+
+static int
+vbdev_ocf_module_config_json(struct spdk_json_write_ctx *w)
+{
+	struct vbdev_ocf_core *core_ctx;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF: generating current module configuration\n");
+
+	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
+		dump_core_config(w, core_ctx);
+	}
+
+	if ((rc = ocf_mngt_cache_visit(vbdev_ocf_ctx, _module_config_json_cache_visitor, w))) {
+		SPDK_ERRLOG("OCF: failed to iterate over bdevs: %s\n", spdk_strerror(-rc));
+		return rc;
+	}
+
+	return 0;
+}
+
+static void
 _destruct_core_detach_cb(ocf_core_t core, void *cb_arg, int error)
 {
 	ocf_cache_t cache = cb_arg;
@@ -966,11 +1053,52 @@ vbdev_ocf_fn_get_io_channel(void *ctx) // ctx == ocf_vbdev.ctxt
 static int
 vbdev_ocf_fn_dump_info_json(void *ctx, struct spdk_json_write_ctx *w)
 {
+	ocf_core_t core = ctx;
+	ocf_cache_t cache = ocf_core_get_cache(core);
+	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': dumping driver specific info\n", ocf_core_get_name(core));
+
+	spdk_json_write_named_object_begin(w, "ocf");
+	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
+	spdk_json_write_named_string(w, "base_name", core_ctx ? core_ctx->base.name : "");
+
+	spdk_json_write_named_object_begin(w, "cache");
+	spdk_json_write_named_string(w, "name", ocf_cache_get_name(cache));
+	spdk_json_write_named_string(w, "base_name", cache_ctx->base.name);
+	spdk_json_write_named_string(w, "cache_mode",
+				     vbdev_ocf_cachemode_get_name(ocf_cache_get_mode(cache)));
+	spdk_json_write_named_uint32(w, "cache_line_size", ocf_cache_get_line_size(cache));
+	spdk_json_write_object_end(w);
+
+	spdk_json_write_object_end(w);
+
 	return 0;
 }
 
 static void
-vbdev_ocf_fn_write_config_json(struct spdk_bdev *bdev, struct spdk_json_write_ctx *w)
+vbdev_ocf_fn_dump_device_stat_json(void *ctx, struct spdk_json_write_ctx *w)
+{
+	ocf_core_t core = ctx;
+	struct vbdev_ocf_stats stats;
+	int rc;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': collecting statistics\n", ocf_core_get_name(core));
+
+	if ((rc = vbdev_ocf_stats_core_get(core, &stats))) {
+		SPDK_ERRLOG("OCF core '%s': failed to collect statistics (OCF error: %d)\n",
+			    ocf_core_get_name(core), rc);
+		return;
+	}
+
+	vbdev_ocf_stats_write_json(w, &stats);
+}
+
+/* Do not define this function to not reset OCF stats when resetting exposed bdev's stats.
+ * Let the user reset OCF stats independently by calling bdev_ocf_reset_stats RPC. */
+static void
+vbdev_ocf_fn_reset_device_stat(void *ctx)
 {
 }
 

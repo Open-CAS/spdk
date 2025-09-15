@@ -1,0 +1,282 @@
+{
+  "cores_waitlist": [
+    {
+      "name": "Ocf_core_waitlist1",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist1",
+      "base_attached": false,
+      "size": 0,
+      "block_size": 0
+    },
+    {
+      "name": "Ocf_core_waitlist2",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist2",
+      "base_attached": true,
+      "size": 209715200,
+      "block_size": 512
+    },
+    {
+      "name": "Ocf_core_waitlist3",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist3",
+      "base_attached": true,
+      "size": 209715200,
+      "block_size": 512
+    }
+  ],
+  "caches": [
+    {
+      "name": "Ocf_cache1",
+      "base_name": "Cache_dev1",
+      "base_attached": false,
+      "size": 0,
+      "block_size": 0,
+      "cache_line_size": 4096,
+      "cache_mode": "wt",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "max_dirty_ratio": 100
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core1-1",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-1",
+          "base_attached": false,
+          "size": 0,
+          "block_size": 0,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core1-2",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core1-3",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ocf_cache2",
+      "base_name": "Cache_dev2",
+      "base_attached": true,
+      "size": 104857600,
+      "block_size": 512,
+      "cache_line_size": 4096,
+      "cache_mode": "wb",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "max_dirty_ratio": 100
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core2-1",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-1",
+          "base_attached": false,
+          "size": 0,
+          "block_size": 0,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core2-2",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core2-3",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ocf_cache3",
+      "base_name": "Cache_dev3",
+      "base_attached": true,
+      "size": 104857600,
+      "block_size": 512,
+      "cache_line_size": 65536,
+      "cache_mode": "pt",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "max_dirty_ratio": 100
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core3-1",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-1",
+          "base_attached": false,
+          "size": 0,
+          "block_size": 0,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core3-2",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core3-3",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    }
+  ]
+}

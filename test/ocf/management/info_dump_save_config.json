@@ -1,0 +1,123 @@
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core_waitlist1",
+    "base_name": "Core_dev_waitlist1",
+    "cache_name": "Ocf_cache_none"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core_waitlist2",
+    "base_name": "Core_dev_waitlist2",
+    "cache_name": "Ocf_cache_none"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core_waitlist3",
+    "base_name": "Core_dev_waitlist3",
+    "cache_name": "Ocf_cache_none"
+  }
+}
+{
+  "method": "bdev_ocf_start_cache",
+  "params": {
+    "cache_name": "Ocf_cache1",
+    "base_name": "Cache_dev1",
+    "cache_mode": "wt",
+    "cache_line_size": 4096
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core1-1",
+    "base_name": "Core_dev1-1",
+    "cache_name": "Ocf_cache1"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core1-2",
+    "base_name": "Core_dev1-2",
+    "cache_name": "Ocf_cache1"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core1-3",
+    "base_name": "Core_dev1-3",
+    "cache_name": "Ocf_cache1"
+  }
+}
+{
+  "method": "bdev_ocf_start_cache",
+  "params": {
+    "cache_name": "Ocf_cache2",
+    "base_name": "Cache_dev2",
+    "cache_mode": "wb",
+    "cache_line_size": 4096
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core2-1",
+    "base_name": "Core_dev2-1",
+    "cache_name": "Ocf_cache2"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core2-2",
+    "base_name": "Core_dev2-2",
+    "cache_name": "Ocf_cache2"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core2-3",
+    "base_name": "Core_dev2-3",
+    "cache_name": "Ocf_cache2"
+  }
+}
+{
+  "method": "bdev_ocf_start_cache",
+  "params": {
+    "cache_name": "Ocf_cache3",
+    "base_name": "Cache_dev3",
+    "cache_mode": "pt",
+    "cache_line_size": 65536
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core3-1",
+    "base_name": "Core_dev3-1",
+    "cache_name": "Ocf_cache3"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core3-2",
+    "base_name": "Core_dev3-2",
+    "cache_name": "Ocf_cache3"
+  }
+}
+{
+  "method": "bdev_ocf_add_core",
+  "params": {
+    "core_name": "Ocf_core3-3",
+    "base_name": "Core_dev3-3",
+    "cache_name": "Ocf_cache3"
+  }
+}

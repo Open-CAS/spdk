@@ -1,0 +1,60 @@
+{
+  "name": "Ocf_core1-2",
+  "base_name": "Core_dev1-2",
+  "cache": {
+    "name": "Ocf_cache1",
+    "base_name": "Cache_dev1",
+    "cache_mode": "wt",
+    "cache_line_size": 4096
+  }
+}
+{
+  "name": "Ocf_core1-3",
+  "base_name": "Core_dev1-3",
+  "cache": {
+    "name": "Ocf_cache1",
+    "base_name": "Cache_dev1",
+    "cache_mode": "wt",
+    "cache_line_size": 4096
+  }
+}
+{
+  "name": "Ocf_core2-2",
+  "base_name": "Core_dev2-2",
+  "cache": {
+    "name": "Ocf_cache2",
+    "base_name": "Cache_dev2",
+    "cache_mode": "wb",
+    "cache_line_size": 4096
+  }
+}
+{
+  "name": "Ocf_core2-3",
+  "base_name": "Core_dev2-3",
+  "cache": {
+    "name": "Ocf_cache2",
+    "base_name": "Cache_dev2",
+    "cache_mode": "wb",
+    "cache_line_size": 4096
+  }
+}
+{
+  "name": "Ocf_core3-2",
+  "base_name": "Core_dev3-2",
+  "cache": {
+    "name": "Ocf_cache3",
+    "base_name": "Cache_dev3",
+    "cache_mode": "pt",
+    "cache_line_size": 65536
+  }
+}
+{
+  "name": "Ocf_core3-3",
+  "base_name": "Core_dev3-3",
+  "cache": {
+    "name": "Ocf_cache3",
+    "base_name": "Cache_dev3",
+    "cache_mode": "pt",
+    "cache_line_size": 65536
+  }
+}

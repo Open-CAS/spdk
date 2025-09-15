@@ -12,6 +12,7 @@ rootdir=$(readlink -f $curdir/../../..)
 source $rootdir/test/common/autotest_common.sh
 
 run_test "start-stop" "$curdir/start-stop/run.sh"
+run_test "info_dump" "$curdir/info_dump.sh"
 run_test "detach-attach" "$curdir/detach-attach.sh"
 run_test "hotremove" "$curdir/hotremove.sh"
 run_test "config_change" "$curdir/config_change.sh"

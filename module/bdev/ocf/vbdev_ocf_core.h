@@ -68,7 +68,7 @@ struct vbdev_ocf_core_io_channel_ctx {
 	struct spdk_thread *		thread;
 
 	/* Currently kept only for its name used in debug log. */
-	ocf_core_t			core; // rm ?
+	ocf_core_t			core;
 };
 
 /*

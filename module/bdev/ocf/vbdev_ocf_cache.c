@@ -19,7 +19,7 @@ vbdev_ocf_cache_is_base_attached(ocf_cache_t cache)
 
 int
 vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cache_mode,
-		       const uint8_t cache_line_size, bool no_load)
+		       const uint32_t cache_line_size, bool no_load)
 {
 	ocf_cache_t cache;
 	struct ocf_mngt_cache_config *cache_cfg;
@@ -41,13 +41,13 @@ vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cac
 	cache_cfg = &cache_ctx->cache_cfg;
 	ocf_mngt_cache_config_set_default(cache_cfg);
 
-	strncpy(cache_cfg->name, cache_name, OCF_CACHE_NAME_SIZE);
+	strlcpy(cache_cfg->name, cache_name, OCF_CACHE_NAME_SIZE);
 
 	if (cache_mode) {
 		cache_cfg->cache_mode = vbdev_ocf_cachemode_get_by_name(cache_mode);
 	}
 	if (cache_line_size) {
-		cache_cfg->cache_line_size = cache_line_size * KiB;
+		cache_cfg->cache_line_size = cache_line_size;
 	}
 	cache_cfg->locked = true;
 
@@ -81,18 +81,14 @@ _cache_hotremove_detach_cb(ocf_cache_t cache, void *cb_arg, int error)
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': finishing hot removal\n",
 		      ocf_cache_get_name(cache));
 
-	// how to detach base despite the error (detached core) and not cause use-after-free on module fini?
-	//vbdev_ocf_cache_base_detach(cache);
-
 	ocf_mngt_cache_unlock(cache);
 
 	if (error) {
 		SPDK_ERRLOG("OCF cache '%s': failed to detach OCF cache device (OCF error: %d)\n",
 			    ocf_cache_get_name(cache), error);
-		return;
+	} else {
+		SPDK_NOTICELOG("OCF cache '%s': device detached\n", ocf_cache_get_name(cache));
 	}
-
-	SPDK_NOTICELOG("OCF cache '%s': device detached\n", ocf_cache_get_name(cache));
 
 	vbdev_ocf_cache_base_detach(cache);
 
@@ -157,7 +153,7 @@ vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name)
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': attaching base bdev '%s'\n",
 		      ocf_cache_get_name(cache), base_name);
 
-	strncpy(base->name, base_name, OCF_CACHE_NAME_SIZE);
+	strlcpy(base->name, base_name, OCF_CACHE_NAME_SIZE);
 
 	if ((rc = spdk_bdev_open_ext(base_name, true, _vbdev_ocf_cache_event_cb, cache, &base->desc))) {
 		return rc;
@@ -212,7 +208,6 @@ vbdev_ocf_cache_config_volume_create(ocf_cache_t cache)
 	cache_att_cfg->open_cores = false;
 	cache_att_cfg->discard_on_start = false;
 	cache_att_cfg->device.perform_test = false;
-	// for ocf_volume_open() in ocf_mngt_cache_attach/load()
 	cache_att_cfg->device.volume_params = &cache_ctx->base;
 	cache_att_cfg->force = cache_ctx->no_load;
 
@@ -348,7 +343,7 @@ vbdev_ocf_cache_mngt_queue_create(ocf_cache_t cache)
 			    ocf_cache_get_name(cache));
 		return -ENOMEM;
 	}
-	mngt_q_ctx->cache = cache; // keep? (only for DEBUGLOG)
+	mngt_q_ctx->cache = cache;
 	mngt_q_ctx->thread = spdk_get_thread();
 
 	if ((rc = ocf_queue_create_mngt(cache, &cache_ctx->cache_mngt_q, &cache_mngt_queue_ops))) {

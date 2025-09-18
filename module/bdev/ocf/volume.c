@@ -17,12 +17,11 @@
 #include "volume.h"
 #include "ctx.h"
 
+/* TODO?: refactor (like ocf_core_volume in ocf_core.c ?) */
 static int
 vbdev_ocf_volume_open(ocf_volume_t volume, void *opts)
 {
 	struct vbdev_ocf_base **priv = ocf_volume_get_priv(volume);
-
-	// refactor (like ocf_core_volume in ocf_core.c ?)
 
 	if (opts) {
 		*priv = opts;
@@ -151,6 +150,12 @@ vbdev_forward_io(ocf_volume_t volume, ocf_forward_token_t token,
 	bool iovs_allocated = false;
 	int iovcnt, skip, status = -1;
 	struct iovec *iovs;
+
+	if (!base->attached) {
+		SPDK_ERRLOG("Base bdev '%s' not attached\n", base->name);
+		ocf_forward_end(token, -ENXIO);
+		return;
+	}
 
 	ch = vbdev_forward_get_channel(volume, token);
 	if (unlikely(ch == NULL)) {

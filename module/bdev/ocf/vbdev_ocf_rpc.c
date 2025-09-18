@@ -11,7 +11,7 @@ struct rpc_bdev_ocf_start_cache {
 	char *cache_name;
 	char *base_name;
 	char *cache_mode;
-	uint8_t cache_line_size;
+	uint32_t cache_line_size;
 	bool no_load;
 };
 
@@ -27,7 +27,7 @@ static const struct spdk_json_object_decoder rpc_bdev_ocf_start_cache_decoders[]
 	{"cache_name", offsetof(struct rpc_bdev_ocf_start_cache, cache_name), spdk_json_decode_string},
 	{"base_name", offsetof(struct rpc_bdev_ocf_start_cache, base_name), spdk_json_decode_string},
 	{"cache_mode", offsetof(struct rpc_bdev_ocf_start_cache, cache_mode), spdk_json_decode_string, true},
-	{"cache_line_size", offsetof(struct rpc_bdev_ocf_start_cache, cache_line_size), spdk_json_decode_uint8, true},
+	{"cache_line_size", offsetof(struct rpc_bdev_ocf_start_cache, cache_line_size), spdk_json_decode_uint32, true},
 	{"no_load", offsetof(struct rpc_bdev_ocf_start_cache, no_load), spdk_json_decode_bool, true},
 };
 

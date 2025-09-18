@@ -12,8 +12,8 @@
 /* Callback for the RPC layer used in all management operations. */
 typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
 
-/* Callback for the RPC layer used in bdev_ocf_get_bdevs call. */
-typedef void (*vbdev_ocf_get_bdevs_cb)(void *cb_arg1, void *cb_arg2);
+/* Callback for the RPC layer used in info dumping calls. */
+typedef void (*vbdev_ocf_rpc_dump_cb)(void *cb_arg1, void *cb_arg2);
 
 /*
  * RPC entry points:
@@ -22,7 +22,7 @@ typedef void (*vbdev_ocf_get_bdevs_cb)(void *cb_arg1, void *cb_arg2);
 void vbdev_ocf_cache_start(const char *cache_name,
 			   const char *base_name,
 			   const char *cache_mode,
-			   const uint8_t cache_line_size,
+			   const uint32_t cache_line_size,
 			   bool no_load,
 			   vbdev_ocf_rpc_mngt_cb rpc_cb_fn,
 			   void *rpc_cb_arg);
@@ -75,7 +75,7 @@ void vbdev_ocf_flush_start(const char *bdev_name,
 			   void *rpc_cb_arg);
 
 void vbdev_ocf_get_stats(const char *bdev_name,
-			 vbdev_ocf_get_bdevs_cb rpc_cb_fn,
+			 vbdev_ocf_rpc_dump_cb rpc_cb_fn,
 			 void *rpc_cb_arg1,
 			 void *rpc_cb_arg2);
 
@@ -84,7 +84,7 @@ void vbdev_ocf_reset_stats(const char *bdev_name,
 			   void *rpc_cb_arg);
 
 void vbdev_ocf_get_bdevs(const char *bdev_name,
-			 vbdev_ocf_get_bdevs_cb rpc_cb_fn,
+			 vbdev_ocf_rpc_dump_cb rpc_cb_fn,
 			 void *rpc_cb_arg1,
 			 void *rpc_cb_arg2);
 

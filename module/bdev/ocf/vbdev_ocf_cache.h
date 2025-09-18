@@ -37,8 +37,9 @@ struct vbdev_ocf_cache {
 	} flush;
 };
 
-/* Callback for the RPC layer used in all management operations. */
+/* Callbacks for the RPC layer. */
 typedef void (*vbdev_ocf_rpc_mngt_cb)(const char *bdev_name, void *cb_arg, int error);
+typedef void (*vbdev_ocf_rpc_dump_cb)(void *cb_arg1, void *cb_arg2);
 
 /* Temporary context for management operations. */
 struct vbdev_ocf_mngt_ctx {
@@ -67,6 +68,12 @@ struct vbdev_ocf_mngt_ctx {
 
 		/* OCF cache mode. */
 		ocf_cache_mode_t		cache_mode;
+
+		/* Callback and context for RPCs that dump info. */
+		struct {
+			vbdev_ocf_rpc_dump_cb	rpc_cb_fn;
+			void *			rpc_cb_arg;
+		} rpc_dump;
 
 		/* Promotion parameters. */
 		struct {
@@ -106,7 +113,7 @@ struct vbdev_ocf_cache_mngt_queue_ctx {
 	struct spdk_thread *		thread;
 
 	/* Currently kept only for its name used in debug log. */
-	ocf_cache_t			cache; // rm ?
+	ocf_cache_t			cache;
 };
 
 /*
@@ -122,7 +129,7 @@ bool vbdev_ocf_cache_is_base_attached(ocf_cache_t cache);
 
 /* Create cache context, fill config and start OCF cache. */
 int vbdev_ocf_cache_create(ocf_cache_t *out, const char *cache_name, const char *cache_mode,
-			   const uint8_t cache_line_size, bool no_load);
+			   const uint32_t cache_line_size, bool no_load);
 
 /* Free cache context. */
 void vbdev_ocf_cache_destroy(ocf_cache_t cache);

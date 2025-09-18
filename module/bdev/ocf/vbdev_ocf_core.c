@@ -114,8 +114,8 @@ vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name, const 
 	core_cfg = &core_ctx->core_cfg;
 	ocf_mngt_core_config_set_default(core_cfg);
 
-	strncpy(core_cfg->name, core_name, OCF_CORE_NAME_SIZE);
-	strncpy(core_ctx->cache_name, cache_name, OCF_CACHE_NAME_SIZE);
+	strlcpy(core_cfg->name, core_name, OCF_CORE_NAME_SIZE);
+	strlcpy(core_ctx->cache_name, cache_name, OCF_CACHE_NAME_SIZE);
 
 	if ((rc = ocf_uuid_set_str(&core_cfg->uuid, core_cfg->name))) {
 		SPDK_ERRLOG("OCF core '%s': failed to set OCF volume uuid\n", core_name);
@@ -190,7 +190,7 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': attaching base bdev '%s'\n",
 		      vbdev_ocf_core_get_name(core_ctx), base_name);
 
-	strncpy(base->name, base_name, OCF_CORE_NAME_SIZE);
+	strlcpy(base->name, base_name, OCF_CORE_NAME_SIZE);
 
 	if ((rc = spdk_bdev_open_ext(base_name, true, _vbdev_ocf_core_event_cb, core_ctx, &base->desc))) {
 		return rc;
@@ -217,7 +217,6 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	base->is_cache = false;
 	base->attached = true;
 	core_cfg->volume_type = SPDK_OBJECT;
-	// for ocf_volume_open() in ocf_mngt_cache_add_core()
 	core_cfg->volume_params = base;
 
 	return rc;
@@ -246,7 +245,7 @@ _core_io_queue_stop(void *ctx)
 	}
 
 	/* Core channel may not exist only on error path. */
-	if (likely(ch_ctx->core_ch)) {
+	if (spdk_likely(ch_ctx->core_ch)) {
 		spdk_put_io_channel(ch_ctx->core_ch);
 	}
 
@@ -315,7 +314,7 @@ _vbdev_ocf_ch_create_cb(void *io_device, void *ctx_buf)
 			    vbdev_name);
 		return -ENOMEM;
 	}
-	ch_ctx->core = core; // keep? (only for DEBUGLOG)
+	ch_ctx->core = core;
 	ch_ctx->thread = spdk_get_thread();
 
 	if ((rc = ocf_queue_create(cache, &ch_ctx->queue, &core_io_queue_ops))) {
@@ -373,6 +372,20 @@ _vbdev_ocf_ch_destroy_cb(void *io_device, void *ctx_buf)
 	ocf_queue_put(ch_destroy_ctx->queue);
 }
 
+static void
+_core_register(void *ctx)
+{
+	struct spdk_bdev *ocf_vbdev = ctx;
+	ocf_core_t core = ocf_vbdev->ctxt;
+	int rc;
+
+	if ((rc = spdk_bdev_register(ocf_vbdev))) {
+		SPDK_ERRLOG("OCF vbdev '%s': failed to register SPDK bdev through message to app thread: %s\n",
+			    spdk_bdev_get_name(ocf_vbdev), spdk_strerror(-rc));
+		spdk_io_device_unregister(core, NULL);
+	}
+}
+
 int
 vbdev_ocf_core_register(ocf_core_t core)
 {
@@ -390,7 +403,6 @@ vbdev_ocf_core_register(ocf_core_t core)
 	ocf_vbdev->write_cache = base->bdev->write_cache;
 	ocf_vbdev->blocklen = base->bdev->blocklen;
 	ocf_vbdev->blockcnt = base->bdev->blockcnt;
-	// cache_line_size align ?
 	ocf_vbdev->required_alignment = base->bdev->required_alignment;
 	ocf_vbdev->optimal_io_boundary = base->bdev->optimal_io_boundary;
 	// generate UUID based on namespace UUID + base bdev UUID (take from old module?)
@@ -402,11 +414,22 @@ vbdev_ocf_core_register(ocf_core_t core)
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': io_device created at %p\n",
 		      spdk_bdev_get_name(ocf_vbdev), core);
 
-	if ((rc = spdk_bdev_register(ocf_vbdev))) { // needs to be called from SPDK app thread
-		SPDK_ERRLOG("OCF vbdev '%s': failed to register SPDK bdev\n",
-			    spdk_bdev_get_name(ocf_vbdev));
-		spdk_io_device_unregister(core, NULL);
-		return rc;
+	if (!spdk_thread_is_app_thread(NULL)) {
+		if ((rc = spdk_thread_send_msg(spdk_thread_get_app_thread(), _core_register, ocf_vbdev))) {
+			SPDK_ERRLOG("OCF vbdev '%s': failed to send message to thread (name: %s, id: %ld): %s\n",
+				    spdk_bdev_get_name(ocf_vbdev),
+				    spdk_thread_get_name(spdk_thread_get_app_thread()),
+				    spdk_thread_get_id(spdk_thread_get_app_thread()),
+				    spdk_strerror(-rc));
+			assert(false);
+		}
+	} else {
+		if ((rc = spdk_bdev_register(ocf_vbdev))) {
+			SPDK_ERRLOG("OCF vbdev '%s': failed to register SPDK bdev\n",
+				    spdk_bdev_get_name(ocf_vbdev));
+			spdk_io_device_unregister(core, NULL);
+			return rc;
+		}
 	}
 
 	return rc;

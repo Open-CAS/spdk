@@ -362,7 +362,8 @@ vbdev_ocf_ctx_cleaner_stop(ocf_cleaner_t c)
 	}
 }
 
-// this one should only set next_run to "now" and poller registration should be move to _init with saved thread
+/* TODO?: this one should only set next_run to "now" and poller
+ * 	  registration should be move to _init with saved thread */
 static void
 vbdev_ocf_ctx_cleaner_kick(ocf_cleaner_t cleaner)
 {

@@ -5,8 +5,8 @@
       "cache_name": "Ocf_cache_none",
       "base_name": "Core_dev_waitlist1",
       "base_attached": false,
-      "size": 0,
-      "block_size": 0
+      "size": null,
+      "block_size": null
     },
     {
       "name": "Ocf_core_waitlist2",
@@ -30,8 +30,8 @@
       "name": "Ocf_cache1",
       "base_name": "Cache_dev1",
       "base_attached": false,
-      "size": 0,
-      "block_size": 0,
+      "size": null,
+      "block_size": null,
       "cache_line_size": 4096,
       "cache_mode": "wt",
       "promotion": {
@@ -56,8 +56,8 @@
           "cache_name": "Ocf_cache1",
           "base_name": "Core_dev1-1",
           "base_attached": false,
-          "size": 0,
-          "block_size": 0,
+          "size": null,
+          "block_size": null,
           "loading": false,
           "seq_cutoff": {
             "policy": "full",
@@ -140,8 +140,8 @@
           "cache_name": "Ocf_cache2",
           "base_name": "Core_dev2-1",
           "base_attached": false,
-          "size": 0,
-          "block_size": 0,
+          "size": null,
+          "block_size": null,
           "loading": false,
           "seq_cutoff": {
             "policy": "full",
@@ -224,8 +224,8 @@
           "cache_name": "Ocf_cache3",
           "base_name": "Core_dev3-1",
           "base_attached": false,
-          "size": 0,
-          "block_size": 0,
+          "size": null,
+          "block_size": null,
           "loading": false,
           "seq_cutoff": {
             "policy": "full",

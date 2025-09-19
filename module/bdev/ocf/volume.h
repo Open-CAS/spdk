@@ -8,13 +8,13 @@
 #define VBDEV_OCF_VOLUME_H
 
 struct vbdev_ocf_base {
-	char				name[spdk_max(OCF_CACHE_NAME_SIZE, OCF_CORE_NAME_SIZE)];
-	bool				is_cache;
-	bool				attached;
-	struct spdk_bdev *		bdev;
-	struct spdk_bdev_desc *		desc;
-	struct spdk_io_channel *	mngt_ch;
-	struct spdk_thread *		thread;
+	char			name[spdk_max(OCF_CACHE_NAME_SIZE, OCF_CORE_NAME_SIZE)];
+	bool			is_cache;
+	bool			attached;
+	struct spdk_bdev	*bdev;
+	struct spdk_bdev_desc	*desc;
+	struct spdk_io_channel	*mngt_ch;
+	struct spdk_thread	*thread;
 };
 
 void vbdev_ocf_base_detach(struct vbdev_ocf_base *base);

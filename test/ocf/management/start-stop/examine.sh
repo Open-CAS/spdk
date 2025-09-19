@@ -102,26 +102,26 @@ done
 # found core device, then start cache:
 
 for remove_cores in false true; do
-for stop_caches in false true; do
-	start_spdk
-	add_cores
-	__check_cores_waitlist_detached
-	create_cores
-	__check_cores_waitlist_attached
-	start_caches
-	__check_caches_detached
-	__check_cores_empty
-	__check_cores_waitlist_attached
-	if [ $remove_cores = true ]; then
-		remove_cores
-		__check_cores_waitlist_empty
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
+	for stop_caches in false true; do
+		start_spdk
+		add_cores
+		__check_cores_waitlist_detached
+		create_cores
+		__check_cores_waitlist_attached
+		start_caches
+		__check_caches_detached
+		__check_cores_empty
+		__check_cores_waitlist_attached
+		if [ $remove_cores = true ]; then
+			remove_cores
+			__check_cores_waitlist_empty
+		fi
+		if [ $stop_caches = true ]; then
+			stop_caches
+			__check_caches_empty
+		fi
+		stop_spdk
+	done
 done
 
 # found cache and then core device:

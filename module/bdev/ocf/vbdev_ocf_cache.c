@@ -160,7 +160,7 @@ vbdev_ocf_cache_base_attach(ocf_cache_t cache, const char *base_name)
 	}
 
 	if ((rc = spdk_bdev_module_claim_bdev_desc(base->desc, SPDK_BDEV_CLAIM_READ_MANY_WRITE_ONE,
-						   NULL, &ocf_if))) {
+			NULL, &ocf_if))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to claim base bdev '%s'\n",
 			    ocf_cache_get_name(cache), base_name);
 		spdk_bdev_close(base->desc);
@@ -298,7 +298,7 @@ vbdev_ocf_cache_mngt_queue_stop(ocf_queue_t queue)
 {
 	struct vbdev_ocf_cache_mngt_queue_ctx *mngt_q_ctx = ocf_queue_get_priv(queue);
 	int rc;
-	
+
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': destroying OCF management queue\n",
 		      ocf_cache_get_name(mngt_q_ctx->cache));
 

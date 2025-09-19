@@ -340,7 +340,7 @@ _module_fini_cache_visitor(ocf_cache_t cache, void *cb_arg)
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': module stop visit\n", ocf_cache_get_name(cache));
 
 	if (!ocf_cache_get_core_count(cache) ||
-			ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
+	    ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
 		/* If there are no cores or all of them are detached,
 		 * then cache stop can be triggered already. */
 		ocf_mngt_cache_lock(cache, _cache_stop_lock_cb, NULL);
@@ -975,7 +975,7 @@ vbdev_ocf_submit_io(struct spdk_io_channel *ch, struct spdk_bdev_io *bdev_io, ui
 
 	/* OCF core should be added before vbdev register and removed after vbdev unregister. */
 	assert(core);
-	
+
 	io = ocf_volume_new_io(ocf_core_get_front_volume(core), ch_ctx->queue,
 			       offset, len, dir, 0, flags);
 	if (spdk_unlikely(!io)) {
@@ -1156,7 +1156,7 @@ _cache_start_rpc_attach_cb(ocf_cache_t cache, void *cb_arg, int error)
 		ocf_mngt_cache_unlock(cache);
 		vbdev_ocf_core_add_from_waitlist(cache);
 	}
-	
+
 	mngt_ctx->rpc_cb_fn(ocf_cache_get_name(cache), mngt_ctx->rpc_cb_arg, error);
 	free(mngt_ctx);
 }
@@ -1277,7 +1277,7 @@ vbdev_ocf_cache_stop(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 	mngt_ctx->cache = cache;
 
 	if (!ocf_cache_get_core_count(cache) ||
-			ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
+	    ocf_cache_get_core_count(cache) == ocf_cache_get_core_inactive_count(cache)) {
 		/* If there are no cores or all of them are detached,
 		 * then cache stop can be triggered already. */
 		ocf_mngt_cache_lock(cache, _cache_stop_lock_cb, mngt_ctx);
@@ -1964,8 +1964,9 @@ _promotion_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 	}
 
 	if (mngt_ctx->u.promotion.nhit_insertion_threshold >= 0) {
-		if ((rc = ocf_mngt_cache_promotion_set_param(cache, ocf_promotion_nhit, ocf_nhit_insertion_threshold,
-							    mngt_ctx->u.promotion.nhit_insertion_threshold))) {
+		if ((rc = ocf_mngt_cache_promotion_set_param(cache, ocf_promotion_nhit,
+				ocf_nhit_insertion_threshold,
+				mngt_ctx->u.promotion.nhit_insertion_threshold))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set promotion nhit_insertion_threshold param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -1974,7 +1975,7 @@ _promotion_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.promotion.nhit_trigger_threshold >= 0) {
 		if ((rc = ocf_mngt_cache_promotion_set_param(cache, ocf_promotion_nhit, ocf_nhit_trigger_threshold,
-							    mngt_ctx->u.promotion.nhit_trigger_threshold))) {
+				mngt_ctx->u.promotion.nhit_trigger_threshold))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set promotion nhit_trigger_threshold param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2071,7 +2072,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.acp_wake_up_time >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp, ocf_acp_wake_up_time,
-							    mngt_ctx->u.cleaning.acp_wake_up_time))) {
+				mngt_ctx->u.cleaning.acp_wake_up_time))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning acp_wake_up_time param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2080,7 +2081,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.acp_flush_max_buffers >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_acp, ocf_acp_flush_max_buffers,
-							    mngt_ctx->u.cleaning.acp_flush_max_buffers))) {
+				mngt_ctx->u.cleaning.acp_flush_max_buffers))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning acp_flush_max_buffers param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2089,7 +2090,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.alru_wake_up_time >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_wake_up_time,
-							    mngt_ctx->u.cleaning.alru_wake_up_time))) {
+				mngt_ctx->u.cleaning.alru_wake_up_time))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_wake_up_time param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2098,7 +2099,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.alru_flush_max_buffers >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_flush_max_buffers,
-							    mngt_ctx->u.cleaning.alru_flush_max_buffers))) {
+				mngt_ctx->u.cleaning.alru_flush_max_buffers))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_flush_max_buffers param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2107,7 +2108,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.alru_staleness_time >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_stale_buffer_time,
-							    mngt_ctx->u.cleaning.alru_staleness_time))) {
+				mngt_ctx->u.cleaning.alru_staleness_time))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_staleness_time param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2116,7 +2117,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.alru_activity_threshold >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_activity_threshold,
-							    mngt_ctx->u.cleaning.alru_activity_threshold))) {
+				mngt_ctx->u.cleaning.alru_activity_threshold))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_activity_threshold param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2125,7 +2126,7 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (mngt_ctx->u.cleaning.alru_max_dirty_ratio >= 0) {
 		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_max_dirty_ratio,
-							    mngt_ctx->u.cleaning.alru_max_dirty_ratio))) {
+				mngt_ctx->u.cleaning.alru_max_dirty_ratio))) {
 			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_max_dirty_ratio param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
@@ -2236,7 +2237,8 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		if (mngt_ctx->u.seqcutoff.promotion_count >= 0) {
-			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count(core, mngt_ctx->u.seqcutoff.promotion_count))) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count(core,
+					mngt_ctx->u.seqcutoff.promotion_count))) {
 				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off promotion_count (OCF error: %d)\n",
 					    ocf_core_get_name(core), rc);
 				goto err_param;
@@ -2244,7 +2246,8 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		if (mngt_ctx->u.seqcutoff.promote_on_threshold >= 0) {
-			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold(core, mngt_ctx->u.seqcutoff.promote_on_threshold))) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold(core,
+					mngt_ctx->u.seqcutoff.promote_on_threshold))) {
 				SPDK_ERRLOG("OCF core '%s': failed to set sequential cut-off promote_on_threshold (OCF error: %d)\n",
 					    ocf_core_get_name(core), rc);
 				goto err_param;
@@ -2266,7 +2269,8 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		if (mngt_ctx->u.seqcutoff.threshold >= 0) {
-			if ((rc = ocf_mngt_core_set_seq_cutoff_threshold_all(cache, mngt_ctx->u.seqcutoff.threshold * KiB))) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_threshold_all(cache,
+					mngt_ctx->u.seqcutoff.threshold * KiB))) {
 				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off threshold (OCF error: %d)\n",
 					    ocf_cache_get_name(cache), rc);
 				goto err_param;
@@ -2274,7 +2278,8 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		if (mngt_ctx->u.seqcutoff.promotion_count >= 0) {
-			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count_all(cache, mngt_ctx->u.seqcutoff.promotion_count))) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promotion_count_all(cache,
+					mngt_ctx->u.seqcutoff.promotion_count))) {
 				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off promotion_count (OCF error: %d)\n",
 					    ocf_cache_get_name(cache), rc);
 				goto err_param;
@@ -2282,7 +2287,8 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 
 		if (mngt_ctx->u.seqcutoff.promote_on_threshold >= 0) {
-			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold_all(cache, mngt_ctx->u.seqcutoff.promote_on_threshold))) {
+			if ((rc = ocf_mngt_core_set_seq_cutoff_promote_on_threshold_all(cache,
+					mngt_ctx->u.seqcutoff.promote_on_threshold))) {
 				SPDK_ERRLOG("OCF cache '%s': failed to set sequential cut-off promote_on_threshold (OCF error: %d)\n",
 					    ocf_cache_get_name(cache), rc);
 				goto err_param;
@@ -2309,8 +2315,8 @@ err_lock:
 /* RPC entry point. */
 void
 vbdev_ocf_set_seqcutoff(const char *bdev_name, const char *policy, int32_t threshold,
-		       int32_t promotion_count, int32_t promote_on_threshold,
-		       vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+			int32_t promotion_count, int32_t promote_on_threshold,
+			vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
 {
 	struct vbdev_ocf_mngt_ctx *mngt_ctx;
 	int rc;
@@ -2627,13 +2633,13 @@ dump_promotion_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
 
 	if (promotion_policy == ocf_promotion_nhit) {
 		if ((rc = ocf_mngt_cache_promotion_get_param(cache, ocf_promotion_nhit,
-							     ocf_nhit_insertion_threshold, &param_val))) {
+				ocf_nhit_insertion_threshold, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "insertion_threshold", param_val);
 
 		if ((rc = ocf_mngt_cache_promotion_get_param(cache, ocf_promotion_nhit,
-							     ocf_nhit_trigger_threshold, &param_val))) {
+				ocf_nhit_trigger_threshold, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "trigger_threshold", param_val);
@@ -2661,44 +2667,44 @@ dump_cleaning_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
 
 	if (cleaning_policy == ocf_cleaning_acp) {
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
-							    ocf_acp_wake_up_time, &param_val))) {
+				ocf_acp_wake_up_time, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "wake_up_time", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_acp,
-							    ocf_acp_flush_max_buffers, &param_val))) {
+				ocf_acp_flush_max_buffers, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "flush_max_buffers", param_val);
 
 	} else if (cleaning_policy == ocf_cleaning_alru) {
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-							    ocf_alru_wake_up_time, &param_val))) {
+				ocf_alru_wake_up_time, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "wake_up_time", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-							    ocf_alru_flush_max_buffers, &param_val))) {
+				ocf_alru_flush_max_buffers, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "flush_max_buffers", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-							    ocf_alru_stale_buffer_time, &param_val))) {
+				ocf_alru_stale_buffer_time, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "staleness_time", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-							    ocf_alru_activity_threshold, &param_val))) {
+				ocf_alru_activity_threshold, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "activity_threshold", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-							    ocf_alru_max_dirty_ratio, &param_val))) {
+				ocf_alru_max_dirty_ratio, &param_val))) {
 			return rc;
 		}
 		spdk_json_write_named_uint32(w, "max_dirty_ratio", param_val);
@@ -2883,7 +2889,8 @@ _get_bdevs_cache_visitor(ocf_cache_t cache, void *cb_arg)
 
 /* RPC entry point. */
 void
-vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void *rpc_cb_arg1, void *rpc_cb_arg2)
+vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void *rpc_cb_arg1,
+		    void *rpc_cb_arg2)
 {
 	struct spdk_json_write_ctx *w = rpc_cb_arg1;
 	struct vbdev_ocf_core *core_ctx;

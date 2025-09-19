@@ -10,7 +10,7 @@
 #include "ctx.h"
 
 struct vbdev_ocf_core_waitlist_head g_vbdev_ocf_core_waitlist =
-		STAILQ_HEAD_INITIALIZER(g_vbdev_ocf_core_waitlist);
+	STAILQ_HEAD_INITIALIZER(g_vbdev_ocf_core_waitlist);
 
 void
 vbdev_ocf_core_waitlist_add(struct vbdev_ocf_core *core_ctx)
@@ -197,7 +197,7 @@ vbdev_ocf_core_base_attach(struct vbdev_ocf_core *core_ctx, const char *base_nam
 	}
 
 	if ((rc = spdk_bdev_module_claim_bdev_desc(base->desc, SPDK_BDEV_CLAIM_READ_MANY_WRITE_ONE,
-						   NULL, &ocf_if))) {
+			NULL, &ocf_if))) {
 		SPDK_ERRLOG("OCF core '%s': failed to claim base bdev '%s'\n",
 			    vbdev_ocf_core_get_name(core_ctx), base_name);
 		spdk_bdev_close(base->desc);
@@ -256,9 +256,10 @@ static void
 vbdev_ocf_core_io_queue_stop(ocf_queue_t queue)
 {
 	struct vbdev_ocf_core_io_channel_ctx *ch_ctx = ocf_queue_get_priv(queue);
-	struct spdk_bdev *ocf_vbdev = &((struct vbdev_ocf_core *)ocf_core_get_priv(ch_ctx->core))->ocf_vbdev;
+	struct spdk_bdev *ocf_vbdev = &((struct vbdev_ocf_core *)ocf_core_get_priv(
+						ch_ctx->core))->ocf_vbdev;
 	int rc;
-	
+
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF vbdev '%s': deallocating external IO channel context\n",
 		      spdk_bdev_get_name(ocf_vbdev));
 
@@ -436,7 +437,8 @@ vbdev_ocf_core_register(ocf_core_t core)
 }
 
 int
-vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregister_cb cb_fn, void *cb_arg)
+vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregister_cb cb_fn,
+			  void *cb_arg)
 {
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating unregister of OCF vbdev\n",
 		      vbdev_ocf_core_get_name(core_ctx));
@@ -516,7 +518,7 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 
 	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
 		if (strcmp(ocf_cache_get_name(cache), core_ctx->cache_name) ||
-				!vbdev_ocf_core_is_base_attached(core_ctx)) {
+		    !vbdev_ocf_core_is_base_attached(core_ctx)) {
 			continue;
 		}
 

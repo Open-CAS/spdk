@@ -37,7 +37,7 @@ seqcutoff_promote_on_threshold_default=false
 set_cache_mode() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local cache_mode=$1
@@ -51,7 +51,7 @@ set_cache_mode() {
 set_promotion_always_params() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -66,7 +66,7 @@ set_promotion_always_params() {
 set_promotion_nhit_params() {
 	if [ $# -ne 3 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -85,7 +85,7 @@ set_promotion_nhit_params() {
 set_cleaning_alru_params() {
 	if [ $# -ne 6 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -110,7 +110,7 @@ set_cleaning_alru_params() {
 set_cleaning_acp_params() {
 	if [ $# -ne 3 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -129,7 +129,7 @@ set_cleaning_acp_params() {
 set_cleaning_nop_params() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -144,7 +144,7 @@ set_cleaning_nop_params() {
 set_seqcutoff_params() {
 	if [ $# -ne 4 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -165,7 +165,7 @@ set_seqcutoff_params() {
 set_seqcutoff_params_all() {
 	if [ $# -ne 4 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -186,7 +186,7 @@ set_seqcutoff_params_all() {
 __check_cache_mode() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local cache_mode=$1
@@ -198,7 +198,7 @@ __check_cache_mode() {
 __check_promotion_always_params() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -211,7 +211,7 @@ __check_promotion_always_params() {
 __check_promotion_nhit_params() {
 	if [ $# -ne 3 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -231,7 +231,7 @@ __check_promotion_nhit_params() {
 __check_cleaning_alru_params() {
 	if [ $# -ne 6 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -260,7 +260,7 @@ __check_cleaning_alru_params() {
 __check_cleaning_acp_params() {
 	if [ $# -ne 3 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -280,7 +280,7 @@ __check_cleaning_acp_params() {
 __check_cleaning_nop_params() {
 	if [ $# -ne 1 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -293,7 +293,7 @@ __check_cleaning_nop_params() {
 __check_seqcutoff_params() {
 	if [ $# -ne 4 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -331,7 +331,7 @@ __check_seqcutoff_params() {
 __check_seqcutoff_params_all() {
 	if [ $# -ne 4 ]; then
 		echo >&2 "invalid number of arguments"
-		exit 1;
+		exit 1
 	fi
 
 	local policy=$1
@@ -358,133 +358,133 @@ __check_seqcutoff_params_all() {
 # cache modes:
 
 for add_cores in false true; do
-for create_caches in false true; do
-for stop_caches in false true; do
-	start_spdk
-	start_caches
-	if [ $create_caches = true ]; then
-		create_caches
-		__check_caches_attached
-		if [ $add_cores = true ]; then
-			create_cores
-			add_cores
-			__check_cores_attached
-		fi
-	else
-		__check_caches_detached
-	fi
-	for cache_mode in "${cache_modes[@]}"; do
-		set_cache_mode $cache_mode
-		__check_cache_mode $cache_mode
+	for create_caches in false true; do
+		for stop_caches in false true; do
+			start_spdk
+			start_caches
+			if [ $create_caches = true ]; then
+				create_caches
+				__check_caches_attached
+				if [ $add_cores = true ]; then
+					create_cores
+					add_cores
+					__check_cores_attached
+				fi
+			else
+				__check_caches_detached
+			fi
+			for cache_mode in "${cache_modes[@]}"; do
+				set_cache_mode $cache_mode
+				__check_cache_mode $cache_mode
+			done
+			if [ $stop_caches = true ]; then
+				stop_caches
+				__check_caches_empty
+			fi
+			stop_spdk
+		done
 	done
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
-done
 done
 
 # promotion params:
 
 for promotion_policy in "${promotion_policies[@]}"; do
-for add_cores in false true; do
-for stop_caches in false true; do
-	start_spdk
-	create_caches
-	start_caches
-	__check_caches_attached
-	if [ $add_cores = true ]; then
-		create_cores
-		add_cores
-		__check_cores_attached
-	fi
-	if [ $promotion_policy = always ]; then
-		set_promotion_always_params $promotion_policy
-		__check_promotion_always_params $promotion_policy
-	elif [ $promotion_policy = nhit ]; then
-		insertion_threshold=$(random_number ${promotion_nhit_insertion_threshold_range[0]} ${promotion_nhit_insertion_threshold_range[1]})
-		trigger_threshold=$(random_number ${promotion_nhit_trigger_threshold_range[0]} ${promotion_nhit_trigger_threshold_range[1]})
-		set_promotion_nhit_params $promotion_policy $insertion_threshold $trigger_threshold
-		__check_promotion_nhit_params $promotion_policy $insertion_threshold $trigger_threshold
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
-done
+	for add_cores in false true; do
+		for stop_caches in false true; do
+			start_spdk
+			create_caches
+			start_caches
+			__check_caches_attached
+			if [ $add_cores = true ]; then
+				create_cores
+				add_cores
+				__check_cores_attached
+			fi
+			if [ $promotion_policy = always ]; then
+				set_promotion_always_params $promotion_policy
+				__check_promotion_always_params $promotion_policy
+			elif [ $promotion_policy = nhit ]; then
+				insertion_threshold=$(random_number ${promotion_nhit_insertion_threshold_range[0]} ${promotion_nhit_insertion_threshold_range[1]})
+				trigger_threshold=$(random_number ${promotion_nhit_trigger_threshold_range[0]} ${promotion_nhit_trigger_threshold_range[1]})
+				set_promotion_nhit_params $promotion_policy $insertion_threshold $trigger_threshold
+				__check_promotion_nhit_params $promotion_policy $insertion_threshold $trigger_threshold
+			fi
+			if [ $stop_caches = true ]; then
+				stop_caches
+				__check_caches_empty
+			fi
+			stop_spdk
+		done
+	done
 done
 
 # cleaning params:
 
 for cleaning_policy in "${cleaning_policies[@]}"; do
-for add_cores in false true; do
-for stop_caches in false true; do
-	start_spdk
-	create_caches
-	start_caches
-	__check_caches_attached
-	if [ $add_cores = true ]; then
-		create_cores
-		add_cores
-		__check_cores_attached
-	fi
-	if [ $cleaning_policy = alru ]; then
-		wake_up_time=$(random_number ${cleaning_alru_wake_up_time_range[0]} ${cleaning_alru_wake_up_time_range[1]})
-		flush_max_buffers=$(random_number ${cleaning_alru_flush_max_buffers_range[0]} ${cleaning_alru_flush_max_buffers_range[1]})
-		staleness_time=$(random_number ${cleaning_alru_staleness_time_range[0]} ${cleaning_alru_staleness_time_range[1]})
-		activity_threshold=$(random_number ${cleaning_alru_activity_threshold_range[0]} ${cleaning_alru_activity_threshold_range[1]})
-		max_dirty_ratio=$(random_number ${cleaning_alru_max_dirty_ratio_range[0]} ${cleaning_alru_max_dirty_ratio_range[1]})
-		set_cleaning_alru_params $cleaning_policy $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
-		__check_cleaning_alru_params $cleaning_policy $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
-	elif [ $cleaning_policy = acp ]; then
-		wake_up_time=$(random_number ${cleaning_acp_wake_up_time_range[0]} ${cleaning_acp_wake_up_time_range[1]})
-		flush_max_buffers=$(random_number ${cleaning_acp_flush_max_buffers_range[0]} ${cleaning_acp_flush_max_buffers_range[1]})
-		set_cleaning_acp_params $cleaning_policy $wake_up_time $flush_max_buffers
-		__check_cleaning_acp_params $cleaning_policy $wake_up_time $flush_max_buffers
-	elif [ $cleaning_policy = nop ]; then
-		set_cleaning_nop_params $cleaning_policy
-		__check_cleaning_nop_params $cleaning_policy
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
-done
+	for add_cores in false true; do
+		for stop_caches in false true; do
+			start_spdk
+			create_caches
+			start_caches
+			__check_caches_attached
+			if [ $add_cores = true ]; then
+				create_cores
+				add_cores
+				__check_cores_attached
+			fi
+			if [ $cleaning_policy = alru ]; then
+				wake_up_time=$(random_number ${cleaning_alru_wake_up_time_range[0]} ${cleaning_alru_wake_up_time_range[1]})
+				flush_max_buffers=$(random_number ${cleaning_alru_flush_max_buffers_range[0]} ${cleaning_alru_flush_max_buffers_range[1]})
+				staleness_time=$(random_number ${cleaning_alru_staleness_time_range[0]} ${cleaning_alru_staleness_time_range[1]})
+				activity_threshold=$(random_number ${cleaning_alru_activity_threshold_range[0]} ${cleaning_alru_activity_threshold_range[1]})
+				max_dirty_ratio=$(random_number ${cleaning_alru_max_dirty_ratio_range[0]} ${cleaning_alru_max_dirty_ratio_range[1]})
+				set_cleaning_alru_params $cleaning_policy $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
+				__check_cleaning_alru_params $cleaning_policy $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
+			elif [ $cleaning_policy = acp ]; then
+				wake_up_time=$(random_number ${cleaning_acp_wake_up_time_range[0]} ${cleaning_acp_wake_up_time_range[1]})
+				flush_max_buffers=$(random_number ${cleaning_acp_flush_max_buffers_range[0]} ${cleaning_acp_flush_max_buffers_range[1]})
+				set_cleaning_acp_params $cleaning_policy $wake_up_time $flush_max_buffers
+				__check_cleaning_acp_params $cleaning_policy $wake_up_time $flush_max_buffers
+			elif [ $cleaning_policy = nop ]; then
+				set_cleaning_nop_params $cleaning_policy
+				__check_cleaning_nop_params $cleaning_policy
+			fi
+			if [ $stop_caches = true ]; then
+				stop_caches
+				__check_caches_empty
+			fi
+			stop_spdk
+		done
+	done
 done
 
 # sequential cut-off params:
 
 for device in core cache; do
-for seqcutoff_policy in "${seqcutoff_policies[@]}"; do
-for stop_caches in false true; do
-	start_spdk
-	create_caches
-	create_cores
-	start_caches
-	add_cores
-	__check_caches_attached
-	__check_cores_attached
-	threshold=$(random_number ${seqcutoff_threshold_range[0]} ${seqcutoff_threshold_range[1]})
-	promotion_count=$(random_number ${seqcutoff_promotion_count_range[0]} ${seqcutoff_promotion_count_range[1]})
-	promote_on_threshold=$(random_number ${seqcutoff_promote_on_threshold_range[0]} ${seqcutoff_promote_on_threshold_range[1]})
-	if [ $device = core ]; then
-		set_seqcutoff_params $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
-		__check_seqcutoff_params $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
-	elif [ $device = cache ]; then
-		set_seqcutoff_params_all $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
-		__check_seqcutoff_params_all $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
-done
+	for seqcutoff_policy in "${seqcutoff_policies[@]}"; do
+		for stop_caches in false true; do
+			start_spdk
+			create_caches
+			create_cores
+			start_caches
+			add_cores
+			__check_caches_attached
+			__check_cores_attached
+			threshold=$(random_number ${seqcutoff_threshold_range[0]} ${seqcutoff_threshold_range[1]})
+			promotion_count=$(random_number ${seqcutoff_promotion_count_range[0]} ${seqcutoff_promotion_count_range[1]})
+			promote_on_threshold=$(random_number ${seqcutoff_promote_on_threshold_range[0]} ${seqcutoff_promote_on_threshold_range[1]})
+			if [ $device = core ]; then
+				set_seqcutoff_params $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
+				__check_seqcutoff_params $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
+			elif [ $device = cache ]; then
+				set_seqcutoff_params_all $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
+				__check_seqcutoff_params_all $seqcutoff_policy $threshold $promotion_count $promote_on_threshold
+			fi
+			if [ $stop_caches = true ]; then
+				stop_caches
+				__check_caches_empty
+			fi
+			stop_spdk
+		done
+	done
 done

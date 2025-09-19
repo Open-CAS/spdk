@@ -39,7 +39,7 @@ struct vbdev_ocf_core {
 	char				cache_name[OCF_CACHE_NAME_SIZE];
 
 	/* Context for cache stop management operation. */
-	struct vbdev_ocf_mngt_ctx *	mngt_ctx;
+	struct vbdev_ocf_mngt_ctx	*mngt_ctx;
 
 	/* Status of core flush operation. */
 	struct {
@@ -53,22 +53,22 @@ struct vbdev_ocf_core {
 /* Core IO channel context. */
 struct vbdev_ocf_core_io_channel_ctx {
 	/* OCF queue. */
-	ocf_queue_t			queue;
+	ocf_queue_t		queue;
 
 	/* Cache base bdev IO channel. */
-	struct spdk_io_channel *	cache_ch;
+	struct spdk_io_channel	*cache_ch;
 
 	/* Core base bdev IO channel. */
-	struct spdk_io_channel *	core_ch;
+	struct spdk_io_channel	*core_ch;
 
 	/* Registered poller. */
-	struct spdk_poller *		poller;
+	struct spdk_poller	*poller;
 
 	/* Thread on which poller was registered and channels were opened. */
-	struct spdk_thread *		thread;
+	struct spdk_thread	*thread;
 
 	/* Currently kept only for its name used in debug log. */
-	ocf_core_t			core;
+	ocf_core_t		core;
 };
 
 /*
@@ -98,7 +98,8 @@ bool vbdev_ocf_core_is_loaded(const char *core_name);
  */
 
 /* Create core context and fill config. */
-int vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name, const char *cache_name);
+int vbdev_ocf_core_create(struct vbdev_ocf_core **out, const char *core_name,
+			  const char *cache_name);
 
 /* Free core context. */
 void vbdev_ocf_core_destroy(struct vbdev_ocf_core *core_ctx);
@@ -113,7 +114,8 @@ void vbdev_ocf_core_base_detach(struct vbdev_ocf_core *core_ctx);
 int vbdev_ocf_core_register(ocf_core_t core);
 
 /* Unregister core from SPDK bdev layer. */
-int vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregister_cb cb_fn, void *cb_arg);
+int vbdev_ocf_core_unregister(struct vbdev_ocf_core *core_ctx, spdk_bdev_unregister_cb cb_fn,
+			      void *cb_arg);
 
 /* Add all cores from wait list assigned to given cache. */
 void vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache);

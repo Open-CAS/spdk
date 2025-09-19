@@ -120,7 +120,10 @@ def add_parser(subparsers):
                    help='choose between {4|8|16|32|64} [KiB]; default 4',
                    type=int,
                    choices=[4, 8, 16, 32, 64])
-    p.add_argument('-n', '--no-load', action='store_true', help='do not load previous cache instance from metadata and force starting a new one instead (WARNING: all cache metadata will be discarded!)')
+    p.add_argument('-n', '--no-load',
+                   action='store_true',
+                   help='do not load previous cache instance from metadata and force starting a \
+                           new one instead (WARNING: all cache metadata will be discarded!)')
     p.set_defaults(func=bdev_ocf_start_cache)
 
     def bdev_ocf_stop_cache(args):
@@ -170,7 +173,8 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_set_cachemode', help='Set cache mode of OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('cache_mode',
-                   help='choose between {wt|wb|wa|wo|wi|pt} (Write-Through, Write-Back, Write-Around, Write-Only, Write-Invalidate, Pass-Through)',
+                   help='choose between {wt|wb|wa|wo|wi|pt} (Write-Through, Write-Back, \
+                           Write-Around, Write-Only, Write-Invalidate, Pass-Through)',
                    choices=['wt', 'wb', 'wa', 'wo', 'wi', 'pt'])
     p.set_defaults(func=bdev_ocf_set_cachemode)
 
@@ -187,7 +191,8 @@ def add_parser(subparsers):
                    choices=['always', 'nhit'],
                    default='none')
     p.add_argument('-i', '--nhit-insertion-threshold',
-                   help='number of requests for given core line after which NHIT policy allows insertion into cache (range <2-1000>; default 3)',
+                   help='number of requests for given core line after which NHIT policy \
+                           allows insertion into cache (range <2-1000>; default 3)',
                    type=int,
                    default=-1)
     p.add_argument('-t', '--nhit-trigger-threshold',
@@ -218,7 +223,8 @@ def add_parser(subparsers):
                    type=int,
                    default=-1)
     p.add_argument('-m', '--acp-flush-max-buffers',
-                   help='number of dirty cache lines to be flushed in a single ACP cleaning thread iteration (range <1-10000>; default 128)',
+                   help='number of dirty cache lines to be flushed in a single ACP \
+                           cleaning thread iteration (range <1-10000>; default 128)',
                    type=int,
                    default=-1)
     p.add_argument('-v', '--alru-wake-up-time',
@@ -230,7 +236,8 @@ def add_parser(subparsers):
                    type=int,
                    default=-1)
     p.add_argument('-s', '--alru-staleness-time',
-                   help='time that has to pass from the last write operation before a dirty cache line can be scheduled to be flushed (range <1-3600> [s]; default 120)',
+                   help='time that has to pass from the last write operation before a dirty cache line \
+                           can be scheduled to be flushed (range <1-3600> [s]; default 120)',
                    type=int,
                    default=-1)
     p.add_argument('-t', '--alru-activity-threshold',
@@ -265,7 +272,8 @@ def add_parser(subparsers):
                    type=int,
                    default=-1)
     p.add_argument('-o', '--promote-on-threshold',
-                   help='whether to promote core sequential cut-off stream to global structures when threshold is reached (choose between {0|1}; default 0)',
+                   help='whether to promote core sequential cut-off stream to global structures \
+                           when threshold is reached (choose between {0|1}; default 0)',
                    choices=[0, 1],
                    type=int,
                    default=-1)
@@ -273,7 +281,10 @@ def add_parser(subparsers):
 
     def bdev_ocf_flush_start(args):
         args.client.bdev_ocf_flush_start(bdev_name=args.bdev_name)
-    p = subparsers.add_parser('bdev_ocf_flush_start', help='Flush all dirty data on the given OCF device (from cache to all of its cores or to particular core only). Note that this call only starts the flushing process which will be running in background and may take some time depending on the underlying device size and speed. You can check flushing status using the bdev_ocf_get_bdevs call.')
+    p = subparsers.add_parser('bdev_ocf_flush_start', help='Flush all dirty data on the given OCF device \
+            (from cache to all of its cores or to particular core only). Note that this call only starts \
+            the flushing process which will be running in background and may take some time depending on \
+            the underlying device size and speed. You can check flushing status using the bdev_ocf_get_bdevs call.')
     p.add_argument('bdev_name', help='name of OCF vbdev to flush')
     p.set_defaults(func=bdev_ocf_flush_start)
 

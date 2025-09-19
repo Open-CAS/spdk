@@ -53,50 +53,50 @@ create_caches_with_metadata_with_cores_persistent() {
 # load caches without cores in metadata:
 
 for add_cores in false true; do
-for stop_caches in false true; do
-	start_spdk
-	create_caches_with_metadata
-	create_cores
-	start_caches_try_load
-	__check_caches_attached
-	__check_cores_empty
-	__check_cores_waitlist_empty
-	if [ $add_cores = true ]; then
-		add_cores
-		__check_cores_attached
+	for stop_caches in false true; do
+		start_spdk
+		create_caches_with_metadata
+		create_cores
+		start_caches_try_load
+		__check_caches_attached
+		__check_cores_empty
 		__check_cores_waitlist_empty
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
+		if [ $add_cores = true ]; then
+			add_cores
+			__check_cores_attached
+			__check_cores_waitlist_empty
+		fi
+		if [ $stop_caches = true ]; then
+			stop_caches
+			__check_caches_empty
+		fi
+		stop_spdk
+	done
 done
 
 # load caches with cores in metadata:
 
 for add_cores in false true; do
-for stop_caches in false true; do
-	start_spdk
-	create_caches_with_metadata_with_cores
-	create_cores
-	start_caches_try_load
-	__check_caches_attached
-	__check_cores_loading
-	__check_cores_waitlist_empty
-	if [ $add_cores = true ]; then
-		add_cores
+	for stop_caches in false true; do
+		start_spdk
+		create_caches_with_metadata_with_cores
+		create_cores
+		start_caches_try_load
 		__check_caches_attached
-		__check_cores_attached
+		__check_cores_loading
 		__check_cores_waitlist_empty
-	fi
-	if [ $stop_caches = true ]; then
-		stop_caches
-		__check_caches_empty
-	fi
-	stop_spdk
-done
+		if [ $add_cores = true ]; then
+			add_cores
+			__check_caches_attached
+			__check_cores_attached
+			__check_cores_waitlist_empty
+		fi
+		if [ $stop_caches = true ]; then
+			stop_caches
+			__check_caches_empty
+		fi
+		stop_spdk
+	done
 done
 
 # load caches with cores in metadata (add cores first):

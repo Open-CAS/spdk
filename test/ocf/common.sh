@@ -42,7 +42,7 @@ destroy_caches() {
 
 create_caches_persistent() {
 	for i in {1..3}; do
-		$rpc_py bdev_virtio_attach_controller -t pci -a "${cache_dev_persistent_addr[i-1]}" -d blk Cache_dev$i
+		$rpc_py bdev_virtio_attach_controller -t pci -a "${cache_dev_persistent_addr[i - 1]}" -d blk Cache_dev$i
 	done
 
 	# Give a bit more time to settle, because this will be called after
@@ -195,7 +195,7 @@ random_number() {
 	# $2: upper range (inclusive)
 	# stdout: random number between range
 
-	echo $(($1 + $RANDOM % ($2-$1+1)))
+	echo $(($1 + RANDOM % ($2 - $1 + 1)))
 }
 
 # Convert an array of items to comma separated list of items.

@@ -44,19 +44,19 @@ typedef void (*vbdev_ocf_rpc_dump_cb)(void *cb_arg1, void *cb_arg2);
 /* Temporary context for management operations. */
 struct vbdev_ocf_mngt_ctx {
 	/* RPC callback. */
-	vbdev_ocf_rpc_mngt_cb		rpc_cb_fn;
+	vbdev_ocf_rpc_mngt_cb	rpc_cb_fn;
 
 	/* RPC context. */
-	void *				rpc_cb_arg;
+	void			*rpc_cb_arg;
 
 	/* Name of bdev. */
-	const char *			bdev_name;
+	const char		*bdev_name;
 
 	/* OCF cache handle. */
-	ocf_cache_t			cache;
+	ocf_cache_t		cache;
 
 	/* OCF core handle. */
-	ocf_core_t			core;
+	ocf_core_t		core;
 
 	union {
 		/* Callback for cache attach operation that needs to be passed through metadata probe
@@ -64,7 +64,7 @@ struct vbdev_ocf_mngt_ctx {
 		ocf_mngt_cache_attach_end_t	att_cb_fn;
 
 		/* Core context (priv). */
-		struct vbdev_ocf_core *		core_ctx;
+		struct vbdev_ocf_core		*core_ctx;
 
 		/* OCF cache mode. */
 		ocf_cache_mode_t		cache_mode;
@@ -72,7 +72,7 @@ struct vbdev_ocf_mngt_ctx {
 		/* Callback and context for RPCs that dump info. */
 		struct {
 			vbdev_ocf_rpc_dump_cb	rpc_cb_fn;
-			void *			rpc_cb_arg;
+			void			*rpc_cb_arg;
 		} rpc_dump;
 
 		/* Promotion parameters. */
@@ -107,13 +107,13 @@ struct vbdev_ocf_mngt_ctx {
 /* Cache management queue context. */
 struct vbdev_ocf_cache_mngt_queue_ctx {
 	/* Registered poller. */
-	struct spdk_poller *		poller;
+	struct spdk_poller	*poller;
 
 	/* Thread on which poller was registered. */
-	struct spdk_thread *		thread;
+	struct spdk_thread	*thread;
 
 	/* Currently kept only for its name used in debug log. */
-	ocf_cache_t			cache;
+	ocf_cache_t		cache;
 };
 
 /*

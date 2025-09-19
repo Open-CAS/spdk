@@ -11,8 +11,7 @@
 
 typedef void (*env_refcnt_cb_t)(void *priv);
 
-struct env_refcnt
-{
+struct env_refcnt {
 	env_atomic counter __attribute__((aligned(64)));
 	env_atomic freeze;
 	env_atomic callback;
@@ -35,7 +34,7 @@ void env_refcnt_dec(struct env_refcnt *rc);
 /* Disallow incrementing of underlying counter - attempts to increment counter
  * will be failing until env_refcnt_unfreeze is calleed.
  * It's ok to call freeze multiple times, in which case counter is frozen
- * until all freeze calls are offset by a corresponding unfreeze.*/
+ * until all freeze calls are offset by a corresponding unfreeze. */
 void env_refcnt_freeze(struct env_refcnt *rc);
 
 /* Cancel the effect of single env_refcnt_freeze call */
@@ -49,6 +48,6 @@ bool env_refcnt_zeroed(struct env_refcnt *rc);
  * Must be called after counter is frozen.
  * Cannot be called until previously regsitered callback had fired. */
 void env_refcnt_register_zero_cb(struct env_refcnt *rc, env_refcnt_cb_t cb,
-		void *priv);
+				 void *priv);
 
-#endif // __OCF_ENV_REFCNT_H__
+#endif /* __OCF_ENV_REFCNT_H__ */

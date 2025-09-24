@@ -2898,19 +2898,19 @@ Example response:
 }
 ~~~
 
-### bdev_ocf_create {#rpc_bdev_ocf_create}
+### bdev_ocf_start_cache {#rpc_bdev_ocf_start_cache}
 
-Construct new OCF bdev.
-Command accepts cache mode that is going to be used.
-You can find more details about supported cache modes in the [OCF documentation](https://open-cas.github.io/cache_configuration.html#cache-mode)
+Start OCF cache instance.
+
+You can find more details about supported options in the [OCF documentation](https://open-cas.com/cache_configuration.html)
 
 #### Parameters
 
-{{ bdev_ocf_create_params }}
+{{ bdev_ocf_start_cache_params }}
 
 #### Response
 
-Name of newly created bdev.
+Name of created OCF cache vbdev.
 
 #### Example
 
@@ -2919,14 +2919,14 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0",
-    "mode": "wt",
+    "cache_name": "Ocf_cache0",
+    "base_name": "Malloc0",
+    "cache_mode": "wb",
     "cache_line_size": 64,
-    "cache_bdev_name": "Nvme0n1",
-    "core_bdev_name": "aio0"
+    "no_load": true
   },
   "jsonrpc": "2.0",
-  "method": "bdev_ocf_create",
+  "method": "bdev_ocf_start_cache",
   "id": 1
 }
 ~~~
@@ -2937,17 +2937,17 @@ Example response:
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "result": "ocf0"
+  "result": "Ocf_cache0"
 }
 ~~~
 
-### bdev_ocf_delete {#rpc_bdev_ocf_delete}
+### bdev_ocf_stop_cache {#rpc_bdev_ocf_stop_cache}
 
-Delete the OCF bdev
+Stop OCF cache instance.
 
 #### Parameters
 
-{{ bdev_ocf_delete_params }}
+{{ bdev_ocf_stop_cache_params }}
 
 #### Example
 
@@ -2956,10 +2956,10 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0"
+    "cache_name": "Ocf_cache0"
   },
   "jsonrpc": "2.0",
-  "method": "bdev_ocf_delete",
+  "method": "bdev_ocf_stop_cache",
   "id": 1
 }
 ~~~
@@ -2974,17 +2974,13 @@ Example response:
 }
 ~~~
 
-### bdev_ocf_get_stats {#rpc_bdev_ocf_get_stats}
+### bdev_ocf_detach_cache {#rpc_bdev_ocf_detach_cache}
 
-Get statistics of chosen OCF block device.
+Detach caching device from OCF cache.
 
 #### Parameters
 
-{{ bdev_ocf_get_stats_params }}
-
-#### Response
-
-Statistics as json object.
+{{ bdev_ocf_detach_cache_params }}
 
 #### Example
 
@@ -2993,224 +2989,10 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0"
+    "cache_name": "Ocf_cache0"
   },
   "jsonrpc": "2.0",
-  "method": "bdev_ocf_get_stats",
-  "id": 1
-}
-~~~
-
-Example response:
-
-~~~json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": [
-    {
-      "usage": {
-        "clean": {
-          "count": 76033,
-          "units": "4KiB blocks",
-          "percentage": "100.0"
-        },
-        "free": {
-          "count": 767,
-          "units": "4KiB blocks",
-          "percentage": "0.9"
-        },
-        "occupancy": {
-          "count": 76033,
-          "units": "4KiB blocks",
-          "percentage": "99.0"
-        },
-        "dirty": {
-          "count": 0,
-          "units": "4KiB blocks",
-          "percentage": "0.0"
-        }
-      }
-    },
-    {
-      "requests": {
-        "rd_total": {
-          "count": 2,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "wr_full_misses": {
-          "count": 76280,
-          "units": "Requests",
-          "percentage": "35.6"
-        },
-        "rd_full_misses": {
-          "count": 1,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "rd_partial_misses": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "wr_total": {
-          "count": 212416,
-          "units": "Requests",
-          "percentage": "99.2"
-        },
-        "wr_pt": {
-          "count": 1535,
-          "units": "Requests",
-          "percentage": "0.7"
-        },
-        "wr_partial_misses": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "serviced": {
-          "count": 212418,
-          "units": "Requests",
-          "percentage": "99.2"
-        },
-        "rd_pt": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "total": {
-          "count": 213953,
-          "units": "Requests",
-          "percentage": "100.0"
-        },
-        "rd_hits": {
-          "count": 1,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "wr_hits": {
-          "count": 136136,
-          "units": "Requests",
-          "percentage": "63.6"
-        }
-      }
-    },
-    {
-      "errors": {
-        "total": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "cache_obj_total": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "core_obj_total": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "cache_obj_rd": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "core_obj_wr": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "core_obj_rd": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        },
-        "cache_obj_wr": {
-          "count": 0,
-          "units": "Requests",
-          "percentage": "0.0"
-        }
-      }
-    },
-    {
-      "blocks": {
-        "volume_rd": {
-          "count": 9,
-          "units": "4KiB blocks",
-          "percentage": "0.0"
-        },
-        "volume_wr": {
-          "count": 213951,
-          "units": "4KiB blocks",
-          "percentage": "99.9"
-        },
-        "cache_obj_total": {
-          "count": 212425,
-          "units": "4KiB blocks",
-          "percentage": "100.0"
-        },
-        "core_obj_total": {
-          "count": 213959,
-          "units": "4KiB blocks",
-          "percentage": "100.0"
-        },
-        "cache_obj_rd": {
-          "count": 1,
-          "units": "4KiB blocks",
-          "percentage": "0.0"
-        },
-        "core_obj_wr": {
-          "count": 213951,
-          "units": "4KiB blocks",
-          "percentage": "99.9"
-        },
-        "volume_total": {
-          "count": 213960,
-          "units": "4KiB blocks",
-          "percentage": "100.0"
-        },
-        "core_obj_rd": {
-          "count": 8,
-          "units": "4KiB blocks",
-          "percentage": "0.0"
-        },
-        "cache_obj_wr": {
-          "count": 212424,
-          "units": "4KiB blocks",
-          "percentage": "99.9"
-        }
-      }
-    }
-  ]
-}
-~~~
-
-### bdev_ocf_reset_stats {#rpc_bdev_ocf_reset_stats}
-
-Reset statistics of chosen OCF block device.
-
-#### Parameters
-
-{{ bdev_ocf_reset_stats_params }}
-
-#### Response
-
-Completion status of reset statistics operation returned as a boolean.
-
-#### Example
-
-Example request:
-
-~~~json
-{
-  "params": {
-    "name": "ocf0"
-  },
-  "jsonrpc": "2.0",
-  "method": "bdev_ocf_reset_stats",
+  "method": "bdev_ocf_detach_cache",
   "id": 1
 }
 ~~~
@@ -3225,64 +3007,13 @@ Example response:
 }
 ~~~
 
-### bdev_ocf_get_bdevs {#rpc_bdev_ocf_get_bdevs}
+### bdev_ocf_attach_cache {#rpc_bdev_ocf_attach_cache}
 
-Get list of OCF devices including unregistered ones.
-
-#### Parameters
-
-{{ bdev_ocf_get_bdevs_params }}
-
-#### Response
-
-Array of OCF devices with their current status, along with core and cache bdevs.
-
-#### Example
-
-Example request:
-
-~~~json
-{
-  "jsonrpc": "2.0",
-  "method": "bdev_ocf_get_bdevs",
-  "id": 1
-}
-~~~
-
-Example response:
-
-~~~json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": [
-    {
-      "name": "PartCache",
-      "started": false,
-      "cache": {
-        "name": "Malloc0",
-        "attached": true
-      },
-      "core": {
-        "name": "Malloc1",
-        "attached": false
-      }
-    }
-  ]
-}
-~~~
-
-### bdev_ocf_set_cache_mode {#rpc_bdev_ocf_set_cache_mode}
-
-Set new cache mode on OCF bdev.
+Attach caching device to OCF cache.
 
 #### Parameters
 
-{{ bdev_ocf_set_cache_mode_params }}
-
-#### Response
-
-New cache mode name.
+{{ bdev_ocf_attach_cache_params }}
 
 #### Example
 
@@ -3291,11 +3022,12 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0",
-    "mode": "pt"
+    "cache_name": "Ocf_cache0",
+    "base_name": "Nvme0n1",
+    "force": true
   },
   "jsonrpc": "2.0",
-  "method": "bdev_ocf_set_cache_mode",
+  "method": "bdev_ocf_attach_cache",
   "id": 1
 }
 ~~~
@@ -3306,14 +3038,199 @@ Example response:
 {
   "jsonrpc": "2.0",
   "id": 1,
-  "result": "pt"
+  "result": true
+}
+~~~
+
+### bdev_ocf_add_core {#rpc_bdev_ocf_add_core}
+
+Add core (backend device) to OCF cache.
+
+#### Parameters
+
+{{ bdev_ocf_add_core_params }}
+
+#### Response
+
+Name of created OCF core vbdev.
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "core_name": "Ocf_core0",
+    "base_name": "Malloc0",
+    "cache_name": "Ocf_cache0"
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_add_core",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": "Ocf_core0"
+}
+~~~
+
+### bdev_ocf_remove_core {#rpc_bdev_ocf_remove_core}
+
+Remove core (backend device) from OCF cache.
+
+#### Parameters
+
+{{ bdev_ocf_remove_core_params }}
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "core_name": "Ocf_core0"
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_remove_core",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_set_cachemode {#rpc_bdev_ocf_set_cachemode}
+
+Set cache mode of OCF cache.
+
+You can find more details about supported cache modes in the [OCF documentation](https://open-cas.com/cache_configuration.html#cache-mode)
+
+#### Parameters
+
+{{ bdev_ocf_set_cachemode_params }}
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "cache_name": "Ocf_cache0",
+    "cache_mode": "wb"
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_cachemode",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_set_promotion {#rpc_bdev_ocf_set_promotion}
+
+Set promotion parameters for OCF cache.
+
+You can find more details about supported promotion parameters in the [OCF documentation](https://open-cas.com/promotion.html)
+
+#### Parameters
+
+{{ bdev_ocf_set_promotion_params }}
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "cache_name": "Ocf_cache0",
+    "policy": "nhit",
+    "nhit_insertion_threshold": 100,
+    "nhit_trigger_threshold": 50
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_promotion",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_set_cleaning {#rpc_bdev_ocf_set_cleaning}
+
+Set cleaning parameters for OCF cache.
+
+You can find more details about supported cleaning parameters in the [OCF documentation](https://open-cas.com/cleaner.html)
+
+#### Parameters
+
+{{ bdev_ocf_set_cleaning_params }}
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "cache_name": "Ocf_cache0",
+    "policy": "acp",
+    "acp_wake_up_time": 150,
+    "acp_flush_max_buffers": 512
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_set_cleaning",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
 }
 ~~~
 
 ### bdev_ocf_set_seqcutoff {#rpc_bdev_ocf_set_seqcutoff}
 
-Set sequential cutoff parameters on all cores for the given OCF cache device.
-A brief description of this functionality can be found in [OpenCAS documentation](https://open-cas.github.io/guide_tool_details.html#seq-cutoff).
+Set sequential cut-off parameters for OCF core or all cores in given cache.
+
+You can find more details about supported sequential cut-off parameters in the [OCF documentation](https://open-cas.com/seq_cutoff.html)
 
 #### Parameters
 
@@ -3326,10 +3243,11 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0",
-    "policy": "full",
-    "threshold": 4,
-    "promotion_count": 2
+    "bdev_name": "Ocf_core0",
+    "policy": "always",
+    "threshold": 4096,
+    "promotion_count": 65535,
+    "promote_on_threshold": 1
   },
   "jsonrpc": "2.0",
   "method": "bdev_ocf_set_seqcutoff",
@@ -3349,16 +3267,10 @@ Example response:
 
 ### bdev_ocf_flush_start {#rpc_bdev_ocf_flush_start}
 
-Start flushing OCF cache device.
+Flush all dirty data on the given OCF device (from cache to all of its cores or to particular core only).
 
-Automatic flushes of dirty data are managed by OCF cleaning policy settings.
-In addition to that, all dirty data is flushed to core device when there is
-an attempt to stop caching.
-On the other hand, this RPC call gives a possibility to flush dirty data manually
-when there is a need for it, e.g. to speed up the shutdown process when data
-hasn't been flushed for a long time.
-This RPC returns immediately, and flush is then being performed in the
-background. To see the status of flushing operation use bdev_ocf_flush_status.
+Note that this call only starts the flushing process which will be running in background and may take some time depending on the underlying device size and speed.
+You can check flushing status using the bdev_ocf_get_bdevs call.
 
 #### Parameters
 
@@ -3371,7 +3283,7 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0"
+    "bdev_name": "Ocf_core0"
   },
   "jsonrpc": "2.0",
   "method": "bdev_ocf_flush_start",
@@ -3389,26 +3301,19 @@ Example response:
 }
 ~~~
 
-### bdev_ocf_flush_status {#rpc_bdev_ocf_flush_status}
+### bdev_ocf_get_stats {#rpc_bdev_ocf_get_stats}
 
-Get flush status of OCF cache device.
+Get statistics of OCF vbdev.
 
-Automatic flushes of dirty data are managed by OCF cleaning policy settings.
-In addition to that, all dirty data is flushed to core device when there is
-an attempt to stop caching.
-On the other hand, there is a possibility to flush dirty data manually
-when there is a need for it, e.g. to speed up the shutdown process when data
-hasn't been flushed for a long time.
-This RPC reports if such manual flush is still in progress and if the operation
-was successful. To start manual flush use bdev_ocf_flush_start.
+Statistics are shown for particular core or all cores in given cache combined depending on which bdev was passed as a parameter.
 
 #### Parameters
 
-{{ bdev_ocf_flush_status_params }}
+{{ bdev_ocf_get_stats_params }}
 
 #### Response
 
-Status of OCF cache device flush.
+Statistics in JSON format.
 
 #### Example
 
@@ -3417,10 +3322,10 @@ Example request:
 ~~~json
 {
   "params": {
-    "name": "ocf0"
+    "name": "Ocf_cache0"
   },
   "jsonrpc": "2.0",
-  "method": "bdev_ocf_flush_status",
+  "method": "bdev_ocf_get_stats",
   "id": 1
 }
 ~~~
@@ -3432,8 +3337,375 @@ Example response:
   "jsonrpc": "2.0",
   "id": 1,
   "result": {
-    "in_progress": false,
-    "status": 0
+    "usage": {
+      "occupancy": {
+        "count": 55521,
+        "percentage": "2.14",
+        "units": "4KiB blocks"
+      },
+      "free": {
+        "count": 2529759,
+        "percentage": "97.85",
+        "units": "4KiB blocks"
+      },
+      "clean": {
+        "count": 55521,
+        "percentage": "2.14",
+        "units": "4KiB blocks"
+      },
+      "dirty": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "4KiB blocks"
+      }
+    },
+    "requests": {
+      "rd_hits": {
+        "count": 12,
+        "percentage": "0.2",
+        "units": "Requests"
+      },
+      "rd_partial_misses": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "rd_full_misses": {
+        "count": 27726,
+        "percentage": "49.83",
+        "units": "Requests"
+      },
+      "rd_total": {
+        "count": 27738,
+        "percentage": "49.85",
+        "units": "Requests"
+      },
+      "wr_hits": {
+        "count": 7,
+        "percentage": "0.1",
+        "units": "Requests"
+      },
+      "wr_partial_misses": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "wr_full_misses": {
+        "count": 27893,
+        "percentage": "50.13",
+        "units": "Requests"
+      },
+      "wr_total": {
+        "count": 27900,
+        "percentage": "50.14",
+        "units": "Requests"
+      },
+      "rd_pt": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "wr_pt": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "serviced": {
+        "count": 55638,
+        "percentage": "100.0",
+        "units": "Requests"
+      },
+      "total": {
+        "count": 55638,
+        "percentage": "100.0",
+        "units": "Requests"
+      }
+    },
+    "blocks": {
+      "core_volume_rd": {
+        "count": 3474,
+        "percentage": "49.89",
+        "units": "4KiB blocks"
+      },
+      "core_volume_wr": {
+        "count": 3488,
+        "percentage": "50.10",
+        "units": "4KiB blocks"
+      },
+      "core_volume_total": {
+        "count": 6962,
+        "percentage": "100.0",
+        "units": "4KiB blocks"
+      },
+      "cache_volume_rd": {
+        "count": 3,
+        "percentage": "0.4",
+        "units": "4KiB blocks"
+      },
+      "cache_volume_wr": {
+        "count": 6961,
+        "percentage": "99.95",
+        "units": "4KiB blocks"
+      },
+      "cache_volume_total": {
+        "count": 6964,
+        "percentage": "100.0",
+        "units": "4KiB blocks"
+      },
+      "volume_rd": {
+        "count": 3476,
+        "percentage": "49.91",
+        "units": "4KiB blocks"
+      },
+      "volume_wr": {
+        "count": 3488,
+        "percentage": "50.8",
+        "units": "4KiB blocks"
+      },
+      "volume_total": {
+        "count": 6964,
+        "percentage": "100.0",
+        "units": "4KiB blocks"
+      }
+    },
+    "errors": {
+      "core_volume_rd": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "core_volume_wr": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "core_volume_total": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "cache_volume_rd": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "cache_volume_wr": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "cache_volume_total": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      },
+      "total": {
+        "count": 0,
+        "percentage": "0.0",
+        "units": "Requests"
+      }
+    }
+  }
+}
+~~~
+
+### bdev_ocf_reset_stats {#rpc_bdev_ocf_reset_stats}
+
+Reset statistics of OCF vbdev.
+
+Statistics are reset for particular core or all cores in given cache depending on which bdev was passed as a parameter.
+
+#### Parameters
+
+{{ bdev_ocf_reset_stats_params }}
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "params": {
+    "name": "Ocf_cache0"
+  },
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_reset_stats",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": true
+}
+~~~
+
+### bdev_ocf_get_bdevs {#rpc_bdev_ocf_get_bdevs}
+
+Get detailed info about OCF vbdevs.
+
+#### Parameters
+
+{{ bdev_ocf_get_bdevs_params }}
+
+#### Response
+
+List of OCF vbdev details in JSON format.
+
+#### Example
+
+Example request:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "method": "bdev_ocf_get_bdevs",
+  "id": 1
+}
+~~~
+
+Example response:
+
+~~~json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "cores_waitlist": [
+      {
+        "name": "Ocf_core_waitlist0",
+        "cache_name": "Ocf_cache2",
+        "base_name": "Nvme2n1",
+        "base_attached": false,
+        "size": null,
+        "block_size": null
+      },
+      {
+        "name": "Ocf_core_waitlist1",
+        "cache_name": "Ocf_cache2",
+        "base_name": "Malloc3",
+        "base_attached": true,
+        "size": 209715200,
+        "block_size": 512
+      }
+    ],
+    "caches": [
+      {
+        "name": "Ocf_cache0",
+        "base_name": "Malloc0",
+        "base_attached": true,
+        "size": 209715200,
+        "block_size": 512,
+        "cache_line_size": 4096,
+        "cache_mode": "wt",
+        "promotion": {
+          "policy": "always"
+        },
+        "cleaning": {
+          "policy": "alru",
+          "wake_up_time": 20,
+          "flush_max_buffers": 100,
+          "staleness_time": 120,
+          "activity_threshold": 10000,
+          "max_dirty_ratio": 100
+        },
+        "flush": {
+          "in_progress": false,
+          "error": 0
+        },
+        "cores_count": 1,
+        "cores": [
+          {
+            "name": "Ocf_core0-0",
+            "cache_name": "Ocf_cache0",
+            "base_name": "Nvme0n1",
+            "base_attached": true,
+            "size": 10737418240,
+            "block_size": 512,
+            "loading": false,
+            "seq_cutoff": {
+              "policy": "full",
+              "threshold": 1024,
+              "promotion_count": 8,
+              "promote_on_threshold": false
+            },
+            "flush": {
+              "in_progress": false,
+              "error": 0
+            }
+          }
+        ]
+      },
+      {
+        "name": "Ocf_cache1",
+        "base_name": "Malloc1",
+        "base_attached": true,
+        "size": 209715200,
+        "block_size": 512,
+        "cache_line_size": 65536,
+        "cache_mode": "wb",
+        "promotion": {
+          "policy": "always"
+        },
+        "cleaning": {
+          "policy": "alru",
+          "wake_up_time": 20,
+          "flush_max_buffers": 100,
+          "staleness_time": 120,
+          "activity_threshold": 10000,
+          "max_dirty_ratio": 100
+        },
+        "flush": {
+          "in_progress": false,
+          "error": 0
+        },
+        "cores_count": 2,
+        "cores": [
+          {
+            "name": "Ocf_core1-0",
+            "cache_name": "Ocf_cache1",
+            "base_name": "Nvme1n1",
+            "base_attached": true,
+            "size": 10737418240,
+            "block_size": 512,
+            "loading": false,
+            "seq_cutoff": {
+              "policy": "full",
+              "threshold": 1024,
+              "promotion_count": 8,
+              "promote_on_threshold": false
+            },
+            "flush": {
+              "in_progress": false,
+              "error": 0
+            }
+          },
+          {
+            "name": "Ocf_core1-1",
+            "cache_name": "Ocf_cache1",
+            "base_name": "Malloc2",
+            "base_attached": true,
+            "size": 262144000,
+            "block_size": 512,
+            "loading": false,
+            "seq_cutoff": {
+              "policy": "full",
+              "threshold": 1024,
+              "promotion_count": 8,
+              "promote_on_threshold": false
+            },
+            "flush": {
+              "in_progress": false,
+              "error": 0
+            }
+          }
+        ]
+      }
+    ]
   }
 }
 ~~~

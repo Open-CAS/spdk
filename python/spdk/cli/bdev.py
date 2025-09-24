@@ -157,7 +157,7 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_add_core', help='Add core (backend device) to OCF cache')
     p.add_argument('core_name', help='name for the new OCF core vbdev')
     p.add_argument('base_name', help='name of the base bdev to use as core')
-    p.add_argument('cache_name', help='name of already started OCF cache vbdev')
+    p.add_argument('cache_name', help='name of the cache vbdev to add this core to')
     p.set_defaults(func=bdev_ocf_add_core)
 
     def bdev_ocf_remove_core(args):
@@ -174,7 +174,7 @@ def add_parser(subparsers):
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('cache_mode',
                    help='choose between {wt|wb|wa|wo|wi|pt} (Write-Through, Write-Back, \
-                           Write-Around, Write-Only, Write-Invalidate, Pass-Through)',
+                           Write-Around, Write-Only, Write-Invalidate, Pass-Through); default "wt"',
                    choices=['wt', 'wb', 'wa', 'wo', 'wi', 'pt'])
     p.set_defaults(func=bdev_ocf_set_cachemode)
 
@@ -187,7 +187,7 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_set_promotion', help='Set promotion parameters for OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
-                   help='promotion policy (choose between {always|nhit})',
+                   help='promotion policy (choose between {always|nhit}; default "always")',
                    choices=['always', 'nhit'],
                    default='none')
     p.add_argument('-i', '--nhit-insertion-threshold',
@@ -215,7 +215,7 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_set_cleaning', help='Set cleaning parameters for OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
-                   help='cleaning policy (choose between {acp|alru|nop})',
+                   help='cleaning policy (choose between {acp|alru|nop}; default "alru")',
                    choices=['acp', 'alru', 'nop'],
                    default='none')
     p.add_argument('-u', '--acp-wake-up-time',
@@ -260,7 +260,7 @@ def add_parser(subparsers):
     p = subparsers.add_parser('bdev_ocf_set_seqcutoff', help='Set sequential cut-off parameters for OCF core or all cores in given cache')
     p.add_argument('bdev_name', help='name of OCF vbdev')
     p.add_argument('-p', '--policy',
-                   help='sequential cut-off policy (choose between {always|full|never})',
+                   help='sequential cut-off policy (choose between {always|full|never}; default "full")',
                    choices=['always', 'full', 'never'],
                    default='none')
     p.add_argument('-t', '--threshold',
@@ -302,7 +302,7 @@ def add_parser(subparsers):
 
     def bdev_ocf_get_bdevs(args):
         print_dict(args.client.bdev_ocf_get_bdevs(bdev_name=args.bdev_name))
-    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get info about OCF vbdevs')
+    p = subparsers.add_parser('bdev_ocf_get_bdevs', help='Get detailed info about OCF vbdevs')
     p.add_argument('bdev_name', nargs='?', help='optional name of specific OCF vbdev (shows all by default)')
     p.set_defaults(func=bdev_ocf_get_bdevs)
 

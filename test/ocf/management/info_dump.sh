@@ -44,7 +44,9 @@ $rpc_py bdev_ocf_get_stats Ocf_cache1 | jq -e \
 	'.requests[], .blocks[], .errors[] | .count == 0 and .percentage == "0.0"'
 
 # Test OCF get bdevs:
-diff <($rpc_py bdev_ocf_get_bdevs | jq -e .) <(jq -e . "$curdir/info_dump_get_bdevs.json")
+# remove UUID fields before comparison as they are changing each run
+diff <($rpc_py bdev_ocf_get_bdevs | sed '/"uuid": /d' | jq -e .) \
+	<(sed '/"uuid": /d' "$curdir/info_dump_get_bdevs.json" | jq -e .)
 
 # Test general get bdevs driver specific info:
 diff <($rpc_py bdev_get_bdevs | jq -e '.[].driver_specific.ocf | select(. != null)') \

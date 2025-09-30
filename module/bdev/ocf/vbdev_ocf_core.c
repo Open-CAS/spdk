@@ -393,6 +393,7 @@ vbdev_ocf_core_register(ocf_core_t core)
 	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
 	struct vbdev_ocf_base *base = &core_ctx->base;
 	struct spdk_bdev *ocf_vbdev = &core_ctx->ocf_vbdev;
+	struct spdk_uuid ns_uuid;
 	int rc = 0;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': registering OCF vbdev in SPDK bdev layer\n",
@@ -406,9 +407,21 @@ vbdev_ocf_core_register(ocf_core_t core)
 	ocf_vbdev->blockcnt = base->bdev->blockcnt;
 	ocf_vbdev->required_alignment = base->bdev->required_alignment;
 	ocf_vbdev->optimal_io_boundary = base->bdev->optimal_io_boundary;
-	// generate UUID based on namespace UUID + base bdev UUID (take from old module?)
 	ocf_vbdev->fn_table = &vbdev_ocf_fn_table;
 	ocf_vbdev->module = &ocf_if;
+
+	/* Generate UUID based on namespace UUID + base bdev UUID. */
+	if ((rc = spdk_uuid_parse(&ns_uuid, BDEV_OCF_NAMESPACE_UUID))) {
+		SPDK_ERRLOG("OCF vbdev '%s': failed to parse namespace UUID\n",
+			    spdk_bdev_get_name(ocf_vbdev));
+		return rc;
+	}
+	if ((rc = spdk_uuid_generate_sha1(&ocf_vbdev->uuid, &ns_uuid,
+					  (const char *)&base->bdev->uuid, sizeof(struct spdk_uuid)))) {
+		SPDK_ERRLOG("OCF vbdev '%s': failed to generate new UUID\n",
+			    spdk_bdev_get_name(ocf_vbdev));
+		return rc;
+	}
 
 	spdk_io_device_register(core, _vbdev_ocf_ch_create_cb, _vbdev_ocf_ch_destroy_cb,
 				sizeof(struct vbdev_ocf_core_io_channel_ctx), ocf_core_get_name(core));

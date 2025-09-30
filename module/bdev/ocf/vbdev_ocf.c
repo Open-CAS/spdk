@@ -15,8 +15,6 @@
 #include "utils.h"
 #include "volume.h"
 
-/* This namespace UUID was generated using uuid_generate() method. */
-#define BDEV_OCF_NAMESPACE_UUID "f92b7f49-f6c0-44c8-bd23-3205e8c3b6ad"
 bool g_vbdev_ocf_module_is_running = false;
 
 static int vbdev_ocf_module_init(void);
@@ -2875,6 +2873,11 @@ dump_core_info(struct spdk_json_write_ctx *w, ocf_core_t core)
 	}
 
 	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
+	if (core_ctx && !spdk_uuid_is_null(spdk_bdev_get_uuid(&core_ctx->ocf_vbdev))) {
+		spdk_json_write_named_uuid(w, "uuid", spdk_bdev_get_uuid(&core_ctx->ocf_vbdev));
+	} else {
+		spdk_json_write_named_null(w, "uuid");
+	}
 	spdk_json_write_named_string(w, "cache_name", ocf_cache_get_name(ocf_core_get_cache(core)));
 	spdk_json_write_named_string(w, "base_name", core_ctx ? core_ctx->base.name : "");
 	spdk_json_write_named_bool(w, "base_attached",

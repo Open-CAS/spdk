@@ -53,6 +53,7 @@
       "cores": [
         {
           "name": "Ocf_core1-1",
+          "uuid": "0be66590-b2b0-58cf-8dde-aa8ed86ee223",
           "cache_name": "Ocf_cache1",
           "base_name": "Core_dev1-1",
           "base_attached": false,
@@ -72,6 +73,7 @@
         },
         {
           "name": "Ocf_core1-2",
+          "uuid": "7ae5d5b1-f2b8-56e6-838e-d6c3e4e4a52d",
           "cache_name": "Ocf_cache1",
           "base_name": "Core_dev1-2",
           "base_attached": true,
@@ -91,6 +93,7 @@
         },
         {
           "name": "Ocf_core1-3",
+          "uuid": "6d587297-39c4-5e4b-899b-faa488c5a976",
           "cache_name": "Ocf_cache1",
           "base_name": "Core_dev1-3",
           "base_attached": true,
@@ -137,6 +140,7 @@
       "cores": [
         {
           "name": "Ocf_core2-1",
+          "uuid": "a3dbab70-2366-5a7b-a22d-a5f27f958fde",
           "cache_name": "Ocf_cache2",
           "base_name": "Core_dev2-1",
           "base_attached": false,
@@ -156,6 +160,7 @@
         },
         {
           "name": "Ocf_core2-2",
+          "uuid": "089e4715-908c-5635-8ff7-e45ce42f0b2b",
           "cache_name": "Ocf_cache2",
           "base_name": "Core_dev2-2",
           "base_attached": true,
@@ -175,6 +180,7 @@
         },
         {
           "name": "Ocf_core2-3",
+          "uuid": "373d6301-3d56-5261-b0bd-dd959c48aa3e",
           "cache_name": "Ocf_cache2",
           "base_name": "Core_dev2-3",
           "base_attached": true,
@@ -221,6 +227,7 @@
       "cores": [
         {
           "name": "Ocf_core3-1",
+          "uuid": "b3c4e428-b6cb-572d-98bf-33d192ba4a62",
           "cache_name": "Ocf_cache3",
           "base_name": "Core_dev3-1",
           "base_attached": false,
@@ -240,6 +247,7 @@
         },
         {
           "name": "Ocf_core3-2",
+          "uuid": "7c321a44-f6b1-5af3-9ce3-2088fa529566",
           "cache_name": "Ocf_cache3",
           "base_name": "Core_dev3-2",
           "base_attached": true,
@@ -259,6 +267,7 @@
         },
         {
           "name": "Ocf_core3-3",
+          "uuid": "5cfe8234-1fd5-5b73-9026-9214652a4475",
           "cache_name": "Ocf_cache3",
           "base_name": "Core_dev3-3",
           "base_attached": true,

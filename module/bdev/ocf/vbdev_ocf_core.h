@@ -10,6 +10,9 @@
 #include "spdk/bdev_module.h"
 #include "volume.h"
 
+/* This namespace UUID was generated using uuid_generate() method. */
+#define BDEV_OCF_NAMESPACE_UUID "f92b7f49-f6c0-44c8-bd23-3205e8c3b6ad"
+
 /* OCF module interface. */
 extern struct spdk_bdev_module ocf_if;
 

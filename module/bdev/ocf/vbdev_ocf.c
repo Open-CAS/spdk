@@ -17,6 +17,7 @@
 
 /* This namespace UUID was generated using uuid_generate() method. */
 #define BDEV_OCF_NAMESPACE_UUID "f92b7f49-f6c0-44c8-bd23-3205e8c3b6ad"
+bool g_vbdev_ocf_module_is_running = false;
 
 static int vbdev_ocf_module_init(void);
 static void vbdev_ocf_module_fini_start(void);
@@ -204,6 +205,8 @@ vbdev_ocf_module_init(void)
 		return rc;
 	}
 
+	g_vbdev_ocf_module_is_running = true;
+
 	return rc;
 }
 
@@ -363,6 +366,8 @@ vbdev_ocf_module_fini_start(void)
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF: initiating module stop\n");
+
+	g_vbdev_ocf_module_is_running = false;
 
 	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
 		if (vbdev_ocf_core_is_base_attached(core_ctx)) {
@@ -1173,6 +1178,12 @@ vbdev_ocf_cache_start(const char *cache_name, const char *base_name,
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating start\n", cache_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (vbdev_ocf_bdev_exists(cache_name)) {
 		SPDK_ERRLOG("OCF '%s': bdev already exists\n", cache_name);
 		rc = -EEXIST;
@@ -1246,6 +1257,7 @@ err_queue:
 	ocf_mngt_cache_stop(cache, _cache_start_rpc_err_cb, NULL);
 err_create:
 err_exist:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -1258,6 +1270,12 @@ vbdev_ocf_cache_stop(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating stop\n", cache_name);
+
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
 
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
@@ -1296,6 +1314,7 @@ err_visit:
 err_alloc:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -1380,6 +1399,12 @@ vbdev_ocf_cache_detach(const char *cache_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, 
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating device detach\n", cache_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
@@ -1410,6 +1435,7 @@ err_alloc:
 err_state:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -1447,6 +1473,12 @@ vbdev_ocf_cache_attach(const char *cache_name, const char *base_name, bool force
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': initiating device attach\n", cache_name);
+
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
 
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
@@ -1507,6 +1539,7 @@ err_base:
 err_state:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -1608,6 +1641,12 @@ vbdev_ocf_core_add(const char *core_name, const char *base_name, const char *cac
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating add\n", core_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (vbdev_ocf_bdev_exists(core_name)) {
 		SPDK_ERRLOG("OCF '%s': bdev already exists\n", core_name);
 		rc = -EEXIST;
@@ -1705,6 +1744,7 @@ err_no_base:
 	vbdev_ocf_core_destroy(core_ctx);
 err_create:
 err_exist:
+err_module:
 	rpc_cb_fn(core_name, rpc_cb_arg, rc);
 }
 
@@ -1781,6 +1821,12 @@ vbdev_ocf_core_remove(const char *core_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': initiating removal\n", core_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	/* If core was not added yet due to lack of base or cache device,
 	 * just free its structs (and detach its base if exists) and exit. */
 	if ((core_ctx = vbdev_ocf_core_waitlist_get_by_name(core_name))) {
@@ -1846,6 +1892,7 @@ err_exist:
 err_resolve:
 	free(mngt_ctx);
 err_alloc:
+err_module:
 	rpc_cb_fn(core_name, rpc_cb_arg, rc);
 }
 
@@ -1915,6 +1962,12 @@ vbdev_ocf_set_cachemode(const char *cache_name, const char *cache_mode,
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting new cache mode '%s'\n", cache_name, cache_mode);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
@@ -1939,6 +1992,7 @@ vbdev_ocf_set_cachemode(const char *cache_name, const char *cache_mode,
 err_alloc:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -2008,6 +2062,12 @@ vbdev_ocf_set_promotion(const char *cache_name, const char *policy,
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting promotion params\n", cache_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
@@ -2034,6 +2094,7 @@ vbdev_ocf_set_promotion(const char *cache_name, const char *policy,
 err_alloc:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -2167,6 +2228,12 @@ vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_w
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': setting cleaning params\n", cache_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, cache_name, OCF_CACHE_NAME_SIZE, &cache)) {
 		SPDK_ERRLOG("OCF cache '%s': not exist\n", cache_name);
 		rc = -ENXIO;
@@ -2199,6 +2266,7 @@ vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_w
 err_alloc:
 	ocf_mngt_cache_put(cache);
 err_cache:
+err_module:
 	rpc_cb_fn(cache_name, rpc_cb_arg, rc);
 }
 
@@ -2323,6 +2391,12 @@ vbdev_ocf_set_seqcutoff(const char *bdev_name, const char *policy, int32_t thres
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': setting sequential cut-off params\n", bdev_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -EPERM);
+		return;
+	}
+
 	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
 	if (!mngt_ctx) {
 		SPDK_ERRLOG("OCF '%s': failed to allocate memory for sequential cut-off set context\n",
@@ -2431,6 +2505,12 @@ vbdev_ocf_flush_start(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': initiating flush operation\n", bdev_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rpc_cb_fn(bdev_name, rpc_cb_arg, -EPERM);
+		return;
+	}
+
 	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
 	if (!mngt_ctx) {
 		SPDK_ERRLOG("OCF '%s': failed to allocate memory for flush context\n", bdev_name);
@@ -2508,6 +2588,11 @@ vbdev_ocf_get_stats(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn,
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': getting statistics\n", bdev_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		goto err_module;
+	}
+
 	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
 	if (!mngt_ctx) {
 		SPDK_ERRLOG("OCF '%s': failed to allocate memory for getting statistics context\n",
@@ -2536,6 +2621,7 @@ vbdev_ocf_get_stats(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn,
 err_resolve:
 	free(mngt_ctx);
 err_alloc:
+err_module:
 	rpc_cb_fn(rpc_cb_arg1, rpc_cb_arg2);
 }
 
@@ -2584,6 +2670,12 @@ vbdev_ocf_reset_stats(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': resetting statistics\n", bdev_name);
 
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		rc = -EPERM;
+		goto err_module;
+	}
+
 	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
 	if (!mngt_ctx) {
 		SPDK_ERRLOG("OCF '%s': failed to allocate memory for resetting statistics context\n",
@@ -2612,6 +2704,7 @@ vbdev_ocf_reset_stats(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 err_resolve:
 	free(mngt_ctx);
 err_alloc:
+err_module:
 	rpc_cb_fn(bdev_name, rpc_cb_arg, rc);
 }
 
@@ -2898,6 +2991,11 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF: getting info about vbdevs\n");
+
+	if (!g_vbdev_ocf_module_is_running) {
+		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
+		goto end;
+	}
 
 	if (!bdev_name) {
 		spdk_json_write_named_array_begin(w, "cores_waitlist");

@@ -1,0 +1,62 @@
+{
+  "subsystems": [
+    {
+      "subsystem": "bdev",
+      "config": [
+        {
+          "method": "bdev_malloc_create",
+          "params": {
+            "name": "Mal_cache1",
+            "num_blocks": 409600,
+            "block_size": 512
+          }
+        },
+        {
+          "method": "bdev_malloc_create",
+          "params": {
+            "name": "Mal_core1-1",
+            "num_blocks": 819200,
+            "block_size": 512
+          }
+        },
+        {
+          "method": "bdev_malloc_create",
+          "params": {
+            "name": "Mal_core1-2",
+            "num_blocks": 819200,
+            "block_size": 512
+          }
+        },
+        {
+          "method": "bdev_ocf_start_cache",
+          "params": {
+            "cache_name": "Ocf_cache1",
+            "base_name": "Mal_cache1",
+            "cache_mode": "wt",
+            "cache_line_size": 4096,
+            "no_load": true
+          }
+        },
+        {
+          "method": "bdev_ocf_add_core",
+          "params": {
+            "core_name": "Ocf_core1-1",
+            "base_name": "Mal_core1-1",
+            "cache_name": "Ocf_cache1"
+          }
+        },
+        {
+          "method": "bdev_ocf_add_core",
+          "params": {
+            "core_name": "Ocf_core1-2",
+            "base_name": "Mal_core1-2",
+            "cache_name": "Ocf_cache1"
+          }
+        },
+        {
+          "method": "bdev_wait_for_examine"
+        }
+      ]
+    }
+  ]
+}

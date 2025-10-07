@@ -1,84 +1,50 @@
 #!/usr/bin/env bash
+
+#
 #  SPDX-License-Identifier: BSD-3-Clause
-#  Copyright (C) 2021 Intel Corporation.
+#  Copyright (C) 2025 Huawei Technologies
 #  All rights reserved.
+#
 
 curdir=$(dirname $(readlink -f "${BASH_SOURCE[0]}"))
-rootdir=$(readlink -f $curdir/../../..)
-source $rootdir/test/common/autotest_common.sh
+rootdir=$(readlink -f "$curdir/../../..")
+source "$rootdir/test/ocf/common.sh"
 
-bdevperf=$rootdir/build/examples/bdevperf
-rpc_py="$rootdir/scripts/rpc.py -s /var/tmp/spdk.sock"
+devices=("Ocf_cache1" "Ocf_core1-1" "Ocf_core1-2")
+cache_modes=("wb" "wo")
+io_patterns=("write" "rw" "randwrite" "randrw")
+io_depth=128
+io_size=4096
+rw_mix=50
+runtime=10
 
 check_flush_in_progress() {
-	$rpc_py bdev_ocf_flush_status MalCache0 \
-		| jq -e '.in_progress' > /dev/null
+	$rpc_py bdev_ocf_get_bdevs $1 | jq -e '.flush.in_progress' > /dev/null
 }
 
-bdevperf_config() {
-	local config
+start_bdevperf -c "$curdir/bdev_config.json"
+$rpc_py bdev_ocf_set_seqcutoff Ocf_cache1 --policy never
+$rpc_py bdev_ocf_set_promotion Ocf_cache1 --policy always
+$rpc_py bdev_ocf_set_cleaning Ocf_cache1 --policy nop
 
-	config="$(
-		cat <<- JSON
-			{
-			  "method": "bdev_malloc_create",
-			  "params": {
-				"name": "Malloc0",
-				"num_blocks": 102400,
-				"block_size": 512
-			  }
-			},
-			{
-			  "method": "bdev_malloc_create",
-			  "params": {
-				"name": "Malloc1",
-				"num_blocks": 1024000,
-				"block_size": 512
-			  }
-			},
-			{
-			  "method": "bdev_ocf_create",
-			  "params": {
-				"name": "MalCache0",
-				"mode": "wb",
-				"cache_line_size": 4,
-				"cache_bdev_name": "Malloc0",
-				"core_bdev_name": "Malloc1"
-			  }
-			}
-		JSON
-	)"
+for cache_mode in "${cache_modes[@]}"; do
+	$rpc_py bdev_ocf_set_cachemode Ocf_cache1 $cache_mode
+	for ip in "${io_patterns[@]}"; do
+		for dev in "${devices[@]}"; do
+			$bdevperf_py perform_tests -t $runtime -q $io_depth -o $io_size \
+				-w $ip $([[ $ip =~ rw$ ]] && echo "-M $rw_mix")
+			for dv in "${devices[@]}"; do
+				$rpc_py bdev_ocf_get_stats $dv | jq -e '.usage | .dirty.count > .clean.count'
+			done
 
-	jq . <<- JSON
-		{
-		  "subsystems": [
-			{
-			  "subsystem": "bdev",
-			  "config": [
-				$(
-			IFS=","
-			printf '%s\n' "$config"
-		),
-				{
-				  "method": "bdev_wait_for_examine"
-				}
-			  ]
-			}
-		  ]
-		}
-	JSON
-}
+			$rpc_py bdev_ocf_flush_start $dev
+			while check_flush_in_progress $dev; do
+				sleep 1
+			done
 
-$bdevperf --json <(bdevperf_config) -q 128 -o 4096 -w write -t 120 -r /var/tmp/spdk.sock &
-bdevperf_pid=$!
-trap 'killprocess $bdevperf_pid' SIGINT SIGTERM EXIT
-waitforlisten $bdevperf_pid
-sleep 5
-
-$rpc_py bdev_ocf_flush_start MalCache0
-sleep 1
-
-while check_flush_in_progress; do
-	sleep 1
+			$rpc_py bdev_ocf_get_bdevs $dev | jq -e '.flush.error == 0'
+			$rpc_py bdev_ocf_get_stats $dev | jq -e '.usage | .dirty.count == 0'
+		done
+	done
 done
-$rpc_py bdev_ocf_flush_status MalCache0 | jq -e '.status == 0'
+stop_bdevperf

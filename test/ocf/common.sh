@@ -7,6 +7,7 @@
 source "$rootdir/test/common/autotest_common.sh"
 
 rpc_py="$rootdir/scripts/rpc.py"
+bdevperf_py="$rootdir/examples/bdev/bdevperf/bdevperf.py"
 
 cache_line_sizes=(4 8 16 32 64)
 cache_modes=("wt" "wb" "wa" "wo" "wi" "pt")
@@ -115,6 +116,18 @@ start_spdk() {
 stop_spdk() {
 	trap - SIGINT SIGTERM EXIT
 	killprocess $spdk_pid
+}
+
+start_bdevperf() {
+	"$SPDK_EXAMPLE_DIR/bdevperf" -z -L vbdev_ocf "$@" &
+	bdevperf_pid=$!
+	trap 'killprocess $bdevperf_pid; exit 1' SIGINT SIGTERM EXIT
+	waitforlisten $bdevperf_pid
+}
+
+stop_bdevperf() {
+	trap - SIGINT SIGTERM EXIT
+	killprocess $bdevperf_pid
 }
 
 ocf_settled() {

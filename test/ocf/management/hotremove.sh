@@ -7,70 +7,8 @@
 #
 
 curdir=$(dirname $(readlink -f "${BASH_SOURCE[0]}"))
-rootdir=$(readlink -f $curdir/../../..)
+rootdir=$(readlink -f "$curdir/../../..")
 source "$rootdir/test/ocf/common.sh"
-
-__check_caches_detached_only_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches | length == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[0].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[1].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[2].base_attached'
-}
-
-__check_caches_detached_all_but_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches | length == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[0].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[1].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[2].base_attached | not'
-}
-
-__check_cores_detached_only_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[0].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[0].loading | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[1].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[1].loading | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[2].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[2].loading | not'
-}
-
-__check_cores_detached_all_but_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores | length == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores_count == 3'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[0].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[0].loading | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[1].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[1].loading | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[2].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.caches[].cores[2].loading | not'
-}
-
-__check_cores_waitlist_detached_only_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist | length == 9'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[0].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[1].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[2].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[3].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[4].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[5].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[6].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[7].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[8].base_attached'
-}
-
-__check_cores_waitlist_detached_all_but_first() {
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist | length == 9'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[0].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[1].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[2].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[3].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[4].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[5].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[6].base_attached'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[7].base_attached | not'
-	$rpc_py bdev_ocf_get_bdevs | jq -e '.cores_waitlist[8].base_attached | not'
-}
 
 # cores in waitlist:
 
@@ -82,11 +20,11 @@ for remove_cores in false true; do
 		__check_cores_waitlist_attached
 		destroy_cores
 		__check_cores_waitlist_detached
-		if [ $create_cores = true ]; then
+		if [ $create_cores == true ]; then
 			create_cores
 			__check_cores_waitlist_attached
 		fi
-		if [ $remove_cores = true ]; then
+		if [ $remove_cores == true ]; then
 			remove_cores
 			__check_cores_waitlist_empty
 		fi
@@ -102,19 +40,13 @@ for remove_cores in false true; do
 		create_cores
 		add_cores
 		__check_cores_waitlist_attached
-		for i in {1..3}; do
-			$rpc_py bdev_malloc_delete Core_dev$i-1
-		done
-		$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		destroy_cores_only_first
 		__check_cores_waitlist_detached_only_first
-		if [ $create_cores = true ]; then
-			for i in {1..3}; do
-				$rpc_py bdev_malloc_create -b Core_dev$i-1 200 512
-			done
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		if [ $create_cores == true ]; then
+			create_cores_only_first
 			__check_cores_waitlist_attached
 		fi
-		if [ $remove_cores = true ]; then
+		if [ $remove_cores == true ]; then
 			remove_cores
 			__check_cores_waitlist_empty
 		fi
@@ -130,21 +62,13 @@ for remove_cores in false true; do
 		create_cores
 		add_cores
 		__check_cores_waitlist_attached
-		for i in {1..3}; do
-			$rpc_py bdev_malloc_delete Core_dev$i-2
-			$rpc_py bdev_malloc_delete Core_dev$i-3
-		done
-		$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		destroy_cores_all_but_first
 		__check_cores_waitlist_detached_all_but_first
-		if [ $create_cores = true ]; then
-			for i in {1..3}; do
-				$rpc_py bdev_malloc_create -b Core_dev$i-2 200 512
-				$rpc_py bdev_malloc_create -b Core_dev$i-3 200 512
-			done
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		if [ $create_cores == true ]; then
+			create_cores_all_but_first
 			__check_cores_waitlist_attached
 		fi
-		if [ $remove_cores = true ]; then
+		if [ $remove_cores == true ]; then
 			remove_cores
 			__check_cores_waitlist_empty
 		fi
@@ -162,11 +86,11 @@ for create_caches in false true; do
 		__check_caches_attached
 		destroy_caches
 		__check_caches_detached
-		if [ $create_caches = true ]; then
+		if [ $create_caches == true ]; then
 			create_caches
 			__check_caches_attached
 		fi
-		if [ $stop_caches = true ]; then
+		if [ $stop_caches == true ]; then
 			stop_caches
 			__check_caches_empty
 		fi
@@ -182,15 +106,13 @@ for create_caches in false true; do
 		create_caches
 		start_caches
 		__check_caches_attached
-		$rpc_py bdev_malloc_delete Cache_dev1
-		$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		destroy_caches_only_first
 		__check_caches_detached_only_first
-		if [ $create_caches = true ]; then
-			$rpc_py bdev_malloc_create -b Cache_dev1 100 512
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		if [ $create_caches == true ]; then
+			create_caches_only_first
 			__check_caches_attached
 		fi
-		if [ $stop_caches = true ]; then
+		if [ $stop_caches == true ]; then
 			stop_caches
 			__check_caches_empty
 		fi
@@ -206,17 +128,13 @@ for create_caches in false true; do
 		create_caches
 		start_caches
 		__check_caches_attached
-		$rpc_py bdev_malloc_delete Cache_dev2
-		$rpc_py bdev_malloc_delete Cache_dev3
-		$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		destroy_caches_all_but_first
 		__check_caches_detached_all_but_first
-		if [ $create_caches = true ]; then
-			$rpc_py bdev_malloc_create -b Cache_dev2 100 512
-			$rpc_py bdev_malloc_create -b Cache_dev3 100 512
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+		if [ $create_caches == true ]; then
+			create_caches_all_but_first
 			__check_caches_attached
 		fi
-		if [ $stop_caches = true ]; then
+		if [ $stop_caches == true ]; then
 			stop_caches
 			__check_caches_empty
 		fi
@@ -239,16 +157,16 @@ for remove_cores in false true; do
 			destroy_caches
 			__check_caches_detached
 			__check_cores_attached
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_detached
 				__check_cores_empty
 			fi
-			if [ $create_caches = true ]; then
+			if [ $create_caches == true ]; then
 				create_caches
 				__check_caches_attached
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -269,21 +187,19 @@ for remove_cores in false true; do
 			add_cores
 			__check_caches_attached
 			__check_cores_attached
-			$rpc_py bdev_malloc_delete Cache_dev1
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			destroy_caches_only_first
 			__check_caches_detached_only_first
 			__check_cores_attached
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_detached_only_first
 				__check_cores_empty
 			fi
-			if [ $create_caches = true ]; then
-				$rpc_py bdev_malloc_create -b Cache_dev1 100 512
-				$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			if [ $create_caches == true ]; then
+				create_caches_only_first
 				__check_caches_attached
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -304,23 +220,19 @@ for remove_cores in false true; do
 			add_cores
 			__check_caches_attached
 			__check_cores_attached
-			$rpc_py bdev_malloc_delete Cache_dev2
-			$rpc_py bdev_malloc_delete Cache_dev3
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			destroy_caches_all_but_first
 			__check_caches_detached_all_but_first
 			__check_cores_attached
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_detached_all_but_first
 				__check_cores_empty
 			fi
-			if [ $create_caches = true ]; then
-				$rpc_py bdev_malloc_create -b Cache_dev2 100 512
-				$rpc_py bdev_malloc_create -b Cache_dev3 100 512
-				$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			if [ $create_caches == true ]; then
+				create_caches_all_but_first
 				__check_caches_attached
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -344,17 +256,17 @@ for create_cores in false true; do
 			destroy_cores
 			__check_caches_attached
 			__check_cores_detached
-			if [ $create_cores = true ]; then
+			if [ $create_cores == true ]; then
 				create_cores
 				__check_caches_attached
 				__check_cores_attached
 			fi
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_attached
 				__check_cores_empty
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -375,26 +287,20 @@ for create_cores in false true; do
 			add_cores
 			__check_caches_attached
 			__check_cores_attached
-			for i in {1..3}; do
-				$rpc_py bdev_malloc_delete Core_dev$i-1
-			done
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			destroy_cores_only_first
 			__check_caches_attached
 			__check_cores_detached_only_first
-			if [ $create_cores = true ]; then
-				for i in {1..3}; do
-					$rpc_py bdev_malloc_create -b Core_dev$i-1 200 512
-				done
-				$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			if [ $create_cores == true ]; then
+				create_cores_only_first
 				__check_caches_attached
 				__check_cores_attached
 			fi
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_attached
 				__check_cores_empty
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -415,28 +321,20 @@ for create_cores in false true; do
 			add_cores
 			__check_caches_attached
 			__check_cores_attached
-			for i in {1..3}; do
-				$rpc_py bdev_malloc_delete Core_dev$i-2
-				$rpc_py bdev_malloc_delete Core_dev$i-3
-			done
-			$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			destroy_cores_all_but_first
 			__check_caches_attached
 			__check_cores_detached_all_but_first
-			if [ $create_cores = true ]; then
-				for i in {1..3}; do
-					$rpc_py bdev_malloc_create -b Core_dev$i-2 200 512
-					$rpc_py bdev_malloc_create -b Core_dev$i-3 200 512
-				done
-				$rpc_py bdev_ocf_get_bdevs | jq -e '.'
+			if [ $create_cores == true ]; then
+				create_cores_all_but_first
 				__check_caches_attached
 				__check_cores_attached
 			fi
-			if [ $remove_cores = true ]; then
+			if [ $remove_cores == true ]; then
 				remove_cores
 				__check_caches_attached
 				__check_cores_empty
 			fi
-			if [ $stop_caches = true ]; then
+			if [ $stop_caches == true ]; then
 				stop_caches
 				__check_caches_empty
 			fi
@@ -460,13 +358,13 @@ for create_caches_and_cores in false true; do
 		__check_caches_detached
 		destroy_cores
 		__check_cores_detached
-		if [ $create_caches_and_cores = true ]; then
+		if [ $create_caches_and_cores == true ]; then
 			create_caches
 			__check_caches_attached
 			create_cores
 			__check_cores_attached
 		fi
-		if [ $stop_caches = true ]; then
+		if [ $stop_caches == true ]; then
 			stop_caches
 			__check_caches_empty
 		fi
@@ -492,12 +390,12 @@ for create_caches in false true; do
 		remove_cores
 		__check_caches_detached
 		__check_cores_empty
-		if [ $create_caches = true ]; then
+		if [ $create_caches == true ]; then
 			create_caches
 			__check_caches_attached
 			__check_cores_empty
 		fi
-		if [ $stop_caches = true ]; then
+		if [ $stop_caches == true ]; then
 			stop_caches
 			__check_caches_empty
 		fi
@@ -523,7 +421,7 @@ for stop_caches in false true; do
 	__check_cores_attached
 	create_caches
 	__check_caches_attached
-	if [ $stop_caches = true ]; then
+	if [ $stop_caches == true ]; then
 		stop_caches
 		__check_caches_empty
 	fi

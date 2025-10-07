@@ -7,9 +7,9 @@
 #
 
 curdir=$(dirname $(readlink -f "${BASH_SOURCE[0]}"))
-rootdir=$(readlink -f $curdir/../../../..)
+rootdir=$(readlink -f "$curdir/../../../..")
 
-source $rootdir/test/common/autotest_common.sh
+source "$rootdir/test/common/autotest_common.sh"
 
 run_test "basic" "$curdir/basic.sh"
 run_test "incomplete" "$curdir/incomplete.sh"

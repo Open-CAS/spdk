@@ -18,13 +18,11 @@ $rpc_py bdev_ocf_start_cache Ocf_cache3 Cache_dev3 --no-load --cache-mode pt --c
 create_cores
 add_cores
 
-# First cache detached.
-$rpc_py bdev_malloc_delete Cache_dev1
-# First core in each cache detached.
-for i in {1..3}; do
-	$rpc_py bdev_malloc_delete Core_dev$i-1
-done
-# First core in wait list detached.
+# first cache detached
+destroy_caches_only_first
+# first core in each cache detached
+destroy_cores_only_first
+# first core in wait list detached
 for i in {2..3}; do
 	$rpc_py bdev_malloc_create -b Core_dev_waitlist$i 200 512
 done
@@ -41,7 +39,7 @@ $rpc_py bdev_ocf_get_stats Ocf_cache1 | jq -e \
 	([.requests[], .blocks[], .errors[] | .percentage] | any(. != "0.0"))'
 $rpc_py bdev_ocf_reset_stats Ocf_cache1
 $rpc_py bdev_ocf_get_stats Ocf_cache1 | jq -e \
-	'.requests[], .blocks[], .errors[] | .count == 0 and .percentage == "0.0"'
+	'[.requests[], .blocks[], .errors[]] | all(.count == 0 and .percentage == "0.0")'
 
 # Test OCF get bdevs:
 # remove UUID fields before comparison as they are changing each run
@@ -53,7 +51,7 @@ diff <($rpc_py bdev_get_bdevs | jq -e '.[].driver_specific.ocf | select(. != nul
 	<(jq -e . "$curdir/info_dump_driver_specific.json")
 
 # Test current config dump:
-diff <($rpc_py save_subsystem_config -n bdev | jq -e '.config[] | select(.method|test("bdev_ocf_"))') \
+diff <($rpc_py save_subsystem_config -n bdev | jq -e '.config[] | select(.method | test("bdev_ocf_"))') \
 	<(jq -e . "$curdir/info_dump_save_config.json")
 
 stop_spdk

@@ -2866,6 +2866,14 @@ dump_core_info(struct spdk_json_write_ctx *w, ocf_core_t core)
 	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
 	int rc;
 
+	/* If this core returns no cache it means that it is
+	 * still in the process of adding itself to the cache.
+	 * Do not print any core info until adding is finished.
+	 * Return an empty JSON object instead. */
+	if (!ocf_core_get_cache(core)) {
+		return 0;
+	}
+
 	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
 	spdk_json_write_named_string(w, "cache_name", ocf_cache_get_name(ocf_core_get_cache(core)));
 	spdk_json_write_named_string(w, "base_name", core_ctx ? core_ctx->base.name : "");

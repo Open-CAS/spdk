@@ -585,7 +585,7 @@ _core_add_examine_add_cb(ocf_cache_t cache, ocf_core_t core, void *cb_arg, int e
 	SPDK_NOTICELOG("OCF core '%s': added to cache '%s'\n",
 		       ocf_core_get_name(core), ocf_cache_get_name(cache));
 
-	/* If core was taken from waitlist, remove it from there. */
+	/* If core was taken from wait list, remove it from there. */
 	if (vbdev_ocf_core_waitlist_get_by_name(vbdev_ocf_core_get_name(core_ctx))) {
 		vbdev_ocf_core_waitlist_remove(core_ctx);
 	}
@@ -610,6 +610,13 @@ _core_add_examine_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		vbdev_ocf_core_base_detach(core_ctx);
 		spdk_bdev_module_examine_done(&ocf_if);
 		return;
+	}
+
+	/* Check if core is loaded from metadata only if its try_add flag was not
+	 * set to true already during examine_config stage. That would mean that
+	 * this core was hot removed before and now it is being attached back. */
+	if (!core_ctx->core_cfg.try_add) {
+		core_ctx->core_cfg.try_add = vbdev_ocf_core_is_loaded(vbdev_ocf_core_get_name(core_ctx));
 	}
 
 	ocf_mngt_cache_add_core(cache, &core_ctx->core_cfg, _core_add_examine_add_cb, core_ctx);
@@ -717,7 +724,7 @@ _examine_disk_core_visitor(ocf_core_t core, void *cb_arg)
 		return 0;
 	}
 
-	/* Get cache once to be in sync with adding core from waitlist scenario. */
+	/* Get cache once to be in sync with adding core from wait list scenario. */
 	ocf_mngt_cache_get(cache);
 	ocf_mngt_cache_lock(cache, _core_add_examine_lock_cb, core_ctx);
 
@@ -754,6 +761,9 @@ vbdev_ocf_module_examine_disk(struct spdk_bdev *bdev)
 			continue;
 		}
 
+		SPDK_NOTICELOG("OCF core '%s': adding from wait list to cache '%s'\n",
+			       vbdev_ocf_core_get_name(core_ctx), core_ctx->cache_name);
+
 		if (ocf_mngt_cache_get_by_name(vbdev_ocf_ctx, core_ctx->cache_name,
 					       OCF_CACHE_NAME_SIZE, &cache)) {
 			SPDK_NOTICELOG("OCF core '%s': add deferred - waiting for OCF cache '%s'\n",
@@ -770,8 +780,6 @@ vbdev_ocf_module_examine_disk(struct spdk_bdev *bdev)
 			spdk_bdev_module_examine_done(&ocf_if);
 			return;
 		}
-
-		core_ctx->core_cfg.try_add = vbdev_ocf_core_is_loaded(vbdev_ocf_core_get_name(core_ctx));
 
 		ocf_mngt_cache_lock(cache, _core_add_examine_lock_cb, core_ctx);
 		return;

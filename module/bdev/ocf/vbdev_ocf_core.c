@@ -67,7 +67,7 @@ _core_is_loaded_cache_visitor(ocf_cache_t cache, void *cb_arg)
 	if (!rc && !ocf_core_get_priv(core)) {
 		/* Core context is assigned only after manual core add (either right
 		 * away if all devices are present, after corresponding cache start,
-		 * or base bdev appearance).
+		 * or base bdev showing up).
 		 * If there is no context, it means that this core was just added from
 		 * metadata during cache load and that's what we're looking for here. */
 
@@ -518,16 +518,27 @@ _core_add_from_waitlist_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		return;
 	}
 
+	core_ctx->core_cfg.try_add = vbdev_ocf_core_is_loaded(vbdev_ocf_core_get_name(core_ctx));
+
 	ocf_mngt_cache_add_core(cache, &core_ctx->core_cfg, _core_add_from_waitlist_add_cb, core_ctx);
 }
 
-void
-vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
+static void
+_core_add_from_waitlist_read_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 {
 	struct vbdev_ocf_cache *cache_ctx = ocf_cache_get_priv(cache);
 	struct vbdev_ocf_core *core_ctx;
 	uint32_t cache_block_size = spdk_bdev_get_block_size(cache_ctx->base.bdev);
 	uint32_t core_block_size;
+
+	SPDK_DEBUGLOG(vbdev_ocf, "OCF cache '%s': looking for its cores in wait list\n",
+		      ocf_cache_get_name(cache));
+
+	if (error) {
+		SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+			    ocf_cache_get_name(cache), error);
+		return;
+	}
 
 	vbdev_ocf_foreach_core_in_waitlist(core_ctx) {
 		if (strcmp(ocf_cache_get_name(cache), core_ctx->cache_name) ||
@@ -535,7 +546,7 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 			continue;
 		}
 
-		SPDK_NOTICELOG("OCF core '%s': adding from waitlist to cache '%s'\n",
+		SPDK_NOTICELOG("OCF core '%s': adding from wait list to cache '%s'\n",
 			       vbdev_ocf_core_get_name(core_ctx), ocf_cache_get_name(cache));
 
 		core_block_size = spdk_bdev_get_block_size(core_ctx->base.bdev);
@@ -546,10 +557,16 @@ vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
 			continue;
 		}
 
-		core_ctx->core_cfg.try_add = vbdev_ocf_core_is_loaded(vbdev_ocf_core_get_name(core_ctx));
-
 		ocf_mngt_cache_lock(cache, _core_add_from_waitlist_lock_cb, core_ctx);
 	}
+
+	ocf_mngt_cache_read_unlock(cache);
+}
+
+void
+vbdev_ocf_core_add_from_waitlist(ocf_cache_t cache)
+{
+	ocf_mngt_cache_read_lock(cache, _core_add_from_waitlist_read_lock_cb, NULL);
 }
 
 static void

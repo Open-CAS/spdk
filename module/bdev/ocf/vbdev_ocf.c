@@ -2977,6 +2977,17 @@ _get_bdevs_cache_visitor(ocf_cache_t cache, void *cb_arg)
 
 	spdk_json_write_object_begin(w);
 
+	if ((rc = ocf_mngt_cache_read_trylock(cache))) {
+		if (rc == -OCF_ERR_NO_LOCK) {
+			SPDK_WARNLOG("OCF cache '%s': cache is busy - no info will be printed for it\n",
+				     ocf_cache_get_name(cache));
+		} else {
+			SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+		}
+		goto end;
+	}
+
 	if ((rc = dump_cache_info(w, cache))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to get cache info: %s\n",
 			    ocf_cache_get_name(cache), spdk_strerror(-rc));
@@ -2986,9 +2997,11 @@ _get_bdevs_cache_visitor(ocf_cache_t cache, void *cb_arg)
 	rc = ocf_core_visit(cache, _get_bdevs_core_visitor, w, false);
 	spdk_json_write_array_end(w);
 
-	spdk_json_write_object_end(w);
+	ocf_mngt_cache_read_unlock(cache);
 
-	return rc;
+end:
+	spdk_json_write_object_end(w);
+	return 0;
 }
 
 /* RPC entry point. */
@@ -2999,13 +3012,14 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 	struct spdk_json_write_ctx *w = rpc_cb_arg1;
 	struct vbdev_ocf_core *core_ctx;
 	struct vbdev_ocf_mngt_ctx *mngt_ctx;
+	ocf_cache_t cache;
 	int rc;
 
 	SPDK_DEBUGLOG(vbdev_ocf, "OCF: getting info about vbdevs\n");
 
 	if (!g_vbdev_ocf_module_is_running) {
 		SPDK_ERRLOG("OCF: failed to handle the call - module stopping\n");
-		goto end;
+		goto end_rpc;
 	}
 
 	if (!bdev_name) {
@@ -3026,7 +3040,7 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 		}
 		spdk_json_write_array_end(w);
 
-		goto end;
+		goto end_rpc;
 	}
 
 	if ((core_ctx = vbdev_ocf_core_waitlist_get_by_name(bdev_name))) {
@@ -3035,14 +3049,14 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 				    vbdev_ocf_core_get_name(core_ctx), spdk_strerror(-rc));
 		}
 
-		goto end;
+		goto end_rpc;
 	}
 
 	mngt_ctx = calloc(1, sizeof(struct vbdev_ocf_mngt_ctx));
 	if (!mngt_ctx) {
 		SPDK_ERRLOG("OCF '%s': failed to allocate memory for getting bdevs info context\n",
 			    bdev_name);
-		goto end;
+		goto end_rpc;
 	}
 	mngt_ctx->bdev_name = bdev_name;
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
@@ -3052,8 +3066,31 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 	if ((rc = vbdev_ocf_bdev_resolve(mngt_ctx))) {
 		SPDK_ERRLOG("OCF '%s': failed to find cache or core of that name: %s\n",
 			    bdev_name, spdk_strerror(-rc));
-		free(mngt_ctx);
-		goto end;
+		goto end_free;
+	}
+
+	cache = mngt_ctx->cache ? : ocf_core_get_cache(mngt_ctx->core);
+	if (!cache) {
+		/* This situation can happen only when ocf_core_get_cache() above
+		 * returned NULL while core is being in the process of adding to its cache.
+		 * However, this core was found previously by vbdev_ocf_bdev_resolve(),
+		 * so it should not be the issue in this scenario. Nevertheless, check for this
+		 * condition just in case, to avoid triggering BUG_ON() on trylock() below. */
+
+		SPDK_WARNLOG("OCF core '%s': adding to cache - no info will be printed for it\n",
+			     ocf_core_get_name(mngt_ctx->core));
+		goto end_free;
+	}
+
+	if ((rc = ocf_mngt_cache_read_trylock(cache))) {
+		if (rc == -OCF_ERR_NO_LOCK) {
+			SPDK_WARNLOG("OCF cache '%s': cache is busy - no info will be printed for it\n",
+				     ocf_cache_get_name(cache));
+		} else {
+			SPDK_ERRLOG("OCF cache '%s': failed to acquire OCF cache lock (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+		}
+		goto end_free;
 	}
 
 	if (mngt_ctx->core) {
@@ -3066,11 +3103,17 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 			SPDK_ERRLOG("OCF cache '%s': failed to get cache info: %s\n",
 				    ocf_cache_get_name(mngt_ctx->cache), spdk_strerror(-rc));
 		}
+
+		spdk_json_write_named_array_begin(w, "cores");
+		rc = ocf_core_visit(mngt_ctx->cache, _get_bdevs_core_visitor, w, false);
+		spdk_json_write_array_end(w);
 	}
 
-	free(mngt_ctx);
+	ocf_mngt_cache_read_unlock(cache);
 
-end:
+end_free:
+	free(mngt_ctx);
+end_rpc:
 	rpc_cb_fn(rpc_cb_arg1, rpc_cb_arg2);
 }
 

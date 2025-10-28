@@ -2308,6 +2308,15 @@ _seqcutoff_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF '%s': setting sequential cut-off on core device\n",
 			      ocf_core_get_name(core));
 
+		/* Once again check if selected core still exists in cache as it may have
+		 * been hot removed between resolving its name and taking this lock. */
+		if ((rc = ocf_core_get_by_name(cache, mngt_ctx->bdev_name,
+					       OCF_CORE_NAME_SIZE, &core))) {
+			SPDK_ERRLOG("OCF core '%s': already removed from cache (OCF error: %d)\n",
+				    mngt_ctx->bdev_name, rc);
+			goto err_param;
+		}
+
 		if (mngt_ctx->u.seqcutoff.policy >= ocf_seq_cutoff_policy_always &&
 		    mngt_ctx->u.seqcutoff.policy < ocf_seq_cutoff_policy_max) {
 			if ((rc = ocf_mngt_core_set_seq_cutoff_policy(core, mngt_ctx->u.seqcutoff.policy))) {
@@ -2498,6 +2507,16 @@ _flush_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 	if (core) {
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': flushing...\n", ocf_core_get_name(core));
 
+		/* Once again check if selected core still exists in cache as it may have
+		 * been hot removed between resolving its name and taking this lock. */
+		if ((rc = ocf_core_get_by_name(cache, mngt_ctx->bdev_name,
+					       OCF_CORE_NAME_SIZE, &core))) {
+			SPDK_ERRLOG("OCF core '%s': already removed from cache (OCF error: %d)\n",
+				    mngt_ctx->bdev_name, rc);
+			ocf_mngt_cache_read_unlock(cache);
+			goto end;
+		}
+
 		core_ctx = ocf_core_get_priv(core);
 		core_ctx->flush.in_progress = true;
 		ocf_mngt_core_flush(core, _flush_core_cb, NULL);
@@ -2574,6 +2593,16 @@ _get_stats_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (core) {
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': collecting statistics\n", ocf_core_get_name(core));
+
+		/* Once again check if selected core still exists in cache as it may have
+		 * been hot removed between resolving its name and taking this lock. */
+		if ((rc = ocf_core_get_by_name(cache, mngt_ctx->bdev_name,
+					       OCF_CORE_NAME_SIZE, &core))) {
+			SPDK_ERRLOG("OCF core '%s': already removed from cache (OCF error: %d)\n",
+				    mngt_ctx->bdev_name, rc);
+			ocf_mngt_cache_read_unlock(cache);
+			goto end;
+		}
 
 		if ((rc = vbdev_ocf_stats_core_get(core, &stats))) {
 			SPDK_ERRLOG("OCF core '%s': failed to collect statistics (OCF error: %d)\n",
@@ -2661,6 +2690,16 @@ _reset_stats_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 
 	if (core) {
 		SPDK_DEBUGLOG(vbdev_ocf, "OCF core '%s': resetting statistics\n", ocf_core_get_name(core));
+
+		/* Once again check if selected core still exists in cache as it may have
+		 * been hot removed between resolving its name and taking this lock. */
+		if ((rc = ocf_core_get_by_name(cache, mngt_ctx->bdev_name,
+					       OCF_CORE_NAME_SIZE, &core))) {
+			SPDK_ERRLOG("OCF core '%s': already removed from cache (OCF error: %d)\n",
+				    mngt_ctx->bdev_name, rc);
+			ocf_mngt_cache_unlock(cache);
+			goto end;
+		}
 
 		if ((rc = vbdev_ocf_stats_core_reset(core))) {
 			SPDK_ERRLOG("OCF core '%s': failed to reset statistics (OCF error: %d)\n",

@@ -473,9 +473,18 @@ _examine_config_cache_visitor(ocf_cache_t cache, void *cb_arg)
 		return rc;
 	}
 
+	/* Update cache IO channel in all cores before attaching new cache device to OCF. */
+	if ((rc = vbdev_ocf_core_create_cache_channel(cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to create IO channel for new cache device\n",
+			    ocf_cache_get_name(cache));
+		vbdev_ocf_cache_base_detach(cache);
+		return rc;
+	}
+
 	if ((rc = vbdev_ocf_cache_config_volume_create(cache))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to create config volume\n",
 			    ocf_cache_get_name(cache));
+		vbdev_ocf_core_destroy_cache_channel(cache);
 		vbdev_ocf_cache_base_detach(cache);
 		return rc;
 	}
@@ -644,17 +653,12 @@ _cache_attach_cb(ocf_cache_t cache, void *cb_arg, int error)
 			vbdev_ocf_mem_calculate(cache);
 		}
 
+		vbdev_ocf_core_destroy_cache_channel(cache);
 		vbdev_ocf_cache_base_detach(cache);
 	} else {
 		SPDK_NOTICELOG("OCF cache '%s': device attached\n", ocf_cache_get_name(cache));
 
-		/* Update cache IO channel after new device attach. */
-		if ((error = vbdev_ocf_core_create_cache_channel(cache))) {
-			SPDK_ERRLOG("OCF cache '%s': failed to create channel for newly attached cache: %s\n",
-				    ocf_cache_get_name(cache), spdk_strerror(-error));
-		} else {
-			vbdev_ocf_core_add_from_waitlist(cache);
-		}
+		vbdev_ocf_core_add_from_waitlist(cache);
 	}
 
 	if (mngt_ctx->rpc_cb_fn) {
@@ -703,6 +707,7 @@ err_alloc:
 	ocf_mngt_cache_unlock(cache);
 err_lock:
 	vbdev_ocf_cache_config_volume_destroy(cache);
+	vbdev_ocf_core_destroy_cache_channel(cache);
 	vbdev_ocf_cache_base_detach(cache);
 	spdk_bdev_module_examine_done(&ocf_if);
 }
@@ -1459,6 +1464,7 @@ _cache_attach_rpc_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 			    ocf_cache_get_name(cache), error);
 		mngt_ctx->rpc_cb_fn(ocf_cache_get_name(cache), mngt_ctx->rpc_cb_arg, error);
 		vbdev_ocf_cache_config_volume_destroy(cache);
+		vbdev_ocf_core_destroy_cache_channel(cache);
 		vbdev_ocf_cache_base_detach(cache);
 		free(mngt_ctx);
 		return;
@@ -1516,6 +1522,13 @@ vbdev_ocf_cache_attach(const char *cache_name, const char *base_name, bool force
 		goto err_base;
 	}
 
+	/* Update cache IO channel in all cores before attaching new cache device to OCF. */
+	if ((rc = vbdev_ocf_core_create_cache_channel(cache))) {
+		SPDK_ERRLOG("OCF cache '%s': failed to create IO channel for new cache device: %s\n",
+			    cache_name, spdk_strerror(-rc));
+		goto err_channel;
+	}
+
 	if ((rc = vbdev_ocf_cache_config_volume_create(cache))) {
 		SPDK_ERRLOG("OCF cache '%s': failed to create config volume: %s\n",
 			    cache_name, spdk_strerror(-rc));
@@ -1540,6 +1553,8 @@ vbdev_ocf_cache_attach(const char *cache_name, const char *base_name, bool force
 err_alloc:
 	vbdev_ocf_cache_config_volume_destroy(cache);
 err_volume:
+	vbdev_ocf_core_destroy_cache_channel(cache);
+err_channel:
 	vbdev_ocf_cache_base_detach(cache);
 err_base:
 err_state:

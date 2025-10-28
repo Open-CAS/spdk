@@ -196,10 +196,15 @@ create_caches_with_metadata_with_cores() {
 	destroy_cores
 }
 
-destroy_caches() {
+destroy_caches_do() {
 	for i in {1..3}; do
 		malloc_cache_destroy Cache_dev$i
 	done
+}
+
+destroy_caches() {
+	destroy_caches_do
+
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
@@ -282,12 +287,17 @@ create_cores() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
-destroy_cores() {
+destroy_cores_do() {
 	for i in {1..3}; do
 		for j in {1..3}; do
 			malloc_core_destroy Core_dev$i-$j
 		done
 	done
+}
+
+destroy_cores() {
+	destroy_cores_do
+
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
@@ -371,17 +381,27 @@ stop_caches() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
-detach_caches() {
+detach_caches_do() {
 	for i in {1..3}; do
 		$rpc_py bdev_ocf_detach_cache Ocf_cache$i
 	done
+}
+
+detach_caches() {
+	detach_caches_do
+
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
-attach_caches() {
+attach_caches_do() {
 	for i in {1..3}; do
 		$rpc_py bdev_ocf_attach_cache Ocf_cache$i Cache_dev$i
 	done
+}
+
+attach_caches() {
+	attach_caches_do
+
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
@@ -399,12 +419,17 @@ add_cores() {
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
-remove_cores() {
+remove_cores_do() {
 	for i in {1..3}; do
 		for j in {1..3}; do
 			$rpc_py bdev_ocf_remove_core Ocf_core$i-$j
 		done
 	done
+}
+
+remove_cores() {
+	remove_cores_do
+
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
 
@@ -675,7 +700,7 @@ __check_cores_waitlist_detached_all_but_first() {
 __check_setup_completed() {
 	for i in {1..3}; do
 		for j in {1..3}; do
-			waitforbdev Core_dev$i-$j 20000
+			waitforbdev Core_dev$i-$j 20000 > /dev/null
 		done
 	done
 

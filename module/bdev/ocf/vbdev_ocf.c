@@ -1867,7 +1867,7 @@ vbdev_ocf_core_remove(const char *core_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 		rc = -ENOMEM;
 		goto err_alloc;
 	}
-	mngt_ctx->bdev_name = core_name;
+	strlcpy(mngt_ctx->bdev_name, core_name, OCF_CORE_NAME_SIZE);
 
 	if ((rc = vbdev_ocf_bdev_resolve(mngt_ctx))) {
 		SPDK_ERRLOG("OCF core '%s': failed to find core of that name: %s\n",
@@ -2436,7 +2436,7 @@ vbdev_ocf_set_seqcutoff(const char *bdev_name, const char *policy, int32_t thres
 	}
 	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
 	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
-	mngt_ctx->bdev_name = bdev_name;
+	strlcpy(mngt_ctx->bdev_name, bdev_name, VBDEV_OCF_BDEV_NAME_SIZE);
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
 	mngt_ctx->cache = NULL;
 	mngt_ctx->core = NULL;
@@ -2559,7 +2559,7 @@ vbdev_ocf_flush_start(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 	}
 	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
 	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
-	mngt_ctx->bdev_name = bdev_name;
+	strlcpy(mngt_ctx->bdev_name, bdev_name, VBDEV_OCF_BDEV_NAME_SIZE);
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
 	mngt_ctx->cache = NULL;
 	mngt_ctx->core = NULL;
@@ -2652,7 +2652,7 @@ vbdev_ocf_get_stats(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn,
 	mngt_ctx->u.rpc_dump.rpc_cb_fn = rpc_cb_fn;
 	mngt_ctx->u.rpc_dump.rpc_cb_arg = rpc_cb_arg1;
 	mngt_ctx->rpc_cb_arg = rpc_cb_arg2;
-	mngt_ctx->bdev_name = bdev_name;
+	strlcpy(mngt_ctx->bdev_name, bdev_name, VBDEV_OCF_BDEV_NAME_SIZE);
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
 	mngt_ctx->cache = NULL;
 	mngt_ctx->core = NULL;
@@ -2745,7 +2745,7 @@ vbdev_ocf_reset_stats(const char *bdev_name, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, vo
 	}
 	mngt_ctx->rpc_cb_fn = rpc_cb_fn;
 	mngt_ctx->rpc_cb_arg = rpc_cb_arg;
-	mngt_ctx->bdev_name = bdev_name;
+	strlcpy(mngt_ctx->bdev_name, bdev_name, VBDEV_OCF_BDEV_NAME_SIZE);
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
 	mngt_ctx->cache = NULL;
 	mngt_ctx->core = NULL;
@@ -3121,7 +3121,7 @@ vbdev_ocf_get_bdevs(const char *bdev_name, vbdev_ocf_rpc_dump_cb rpc_cb_fn, void
 			    bdev_name);
 		goto end_rpc;
 	}
-	mngt_ctx->bdev_name = bdev_name;
+	strlcpy(mngt_ctx->bdev_name, bdev_name, VBDEV_OCF_BDEV_NAME_SIZE);
 	/* Cache or core will be set using vbdev_ocf_bdev_resolve(). */
 	mngt_ctx->cache = NULL;
 	mngt_ctx->core = NULL;

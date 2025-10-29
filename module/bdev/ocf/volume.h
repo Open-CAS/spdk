@@ -7,8 +7,10 @@
 #ifndef VBDEV_OCF_VOLUME_H
 #define VBDEV_OCF_VOLUME_H
 
+#define VBDEV_OCF_BDEV_NAME_SIZE spdk_max(OCF_CACHE_NAME_SIZE, OCF_CORE_NAME_SIZE)
+
 struct vbdev_ocf_base {
-	char			name[spdk_max(OCF_CACHE_NAME_SIZE, OCF_CORE_NAME_SIZE)];
+	char			name[VBDEV_OCF_BDEV_NAME_SIZE];
 	bool			is_cache;
 	bool			attached;
 	struct spdk_bdev	*bdev;

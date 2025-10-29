@@ -50,7 +50,7 @@ struct vbdev_ocf_mngt_ctx {
 	void			*rpc_cb_arg;
 
 	/* Name of bdev. */
-	const char		*bdev_name;
+	char			bdev_name[VBDEV_OCF_BDEV_NAME_SIZE];
 
 	/* OCF cache handle. */
 	ocf_cache_t		cache;

@@ -2923,28 +2923,29 @@ dump_core_waitlist_info(struct spdk_json_write_ctx *w, struct vbdev_ocf_core *co
 static int
 dump_core_info(struct spdk_json_write_ctx *w, ocf_core_t core)
 {
-	struct vbdev_ocf_core *core_ctx = ocf_core_get_priv(core);
+	struct vbdev_ocf_core *core_ctx_priv = ocf_core_get_priv(core);
+	struct vbdev_ocf_core _core_ctx = {};
+	struct vbdev_ocf_core *core_ctx = &_core_ctx;
 	int rc;
 
-	/* If this core returns no cache it means that it is
-	 * still in the process of adding itself to the cache.
-	 * Do not print any core info until adding is finished.
-	 * Return an empty JSON object instead. */
-	if (!ocf_core_get_cache(core)) {
-		return 0;
+	/* If core context exists, make a local copy of it in
+	 * case it is freed by other thread in the meantime.
+	 * If it doesn't exist, a temporary empty context
+	 * (initialized with zeros) will be used instead. */
+	if (core_ctx_priv) {
+		_core_ctx = *core_ctx_priv;
 	}
 
 	spdk_json_write_named_string(w, "name", ocf_core_get_name(core));
-	if (core_ctx && !spdk_uuid_is_null(spdk_bdev_get_uuid(&core_ctx->ocf_vbdev))) {
+	if (!spdk_uuid_is_null(spdk_bdev_get_uuid(&core_ctx->ocf_vbdev))) {
 		spdk_json_write_named_uuid(w, "uuid", spdk_bdev_get_uuid(&core_ctx->ocf_vbdev));
 	} else {
 		spdk_json_write_named_null(w, "uuid");
 	}
 	spdk_json_write_named_string(w, "cache_name", ocf_cache_get_name(ocf_core_get_cache(core)));
-	spdk_json_write_named_string(w, "base_name", core_ctx ? core_ctx->base.name : "");
-	spdk_json_write_named_bool(w, "base_attached",
-				   core_ctx ? vbdev_ocf_core_is_base_attached(core_ctx) : false);
-	if (core_ctx && vbdev_ocf_core_is_base_attached(core_ctx)) {
+	spdk_json_write_named_string(w, "base_name", core_ctx->base.name);
+	spdk_json_write_named_bool(w, "base_attached", vbdev_ocf_core_is_base_attached(core_ctx));
+	if (vbdev_ocf_core_is_base_attached(core_ctx)) {
 		spdk_json_write_named_uint64(w, "size", spdk_bdev_get_block_size(core_ctx->base.bdev) *
 					     spdk_bdev_get_num_blocks(core_ctx->base.bdev));
 		spdk_json_write_named_uint32(w, "block_size", spdk_bdev_get_block_size(core_ctx->base.bdev));
@@ -2952,7 +2953,7 @@ dump_core_info(struct spdk_json_write_ctx *w, ocf_core_t core)
 		spdk_json_write_named_null(w, "size");
 		spdk_json_write_named_null(w, "block_size");
 	}
-	spdk_json_write_named_bool(w, "loading", !core_ctx);
+	spdk_json_write_named_bool(w, "loading", !core_ctx_priv);
 
 	spdk_json_write_named_object_begin(w, "seq_cutoff");
 	if ((rc = dump_seqcutoff_info(w, core))) {
@@ -2962,8 +2963,8 @@ dump_core_info(struct spdk_json_write_ctx *w, ocf_core_t core)
 	spdk_json_write_object_end(w);
 
 	spdk_json_write_named_object_begin(w, "flush");
-	spdk_json_write_named_bool(w, "in_progress", core_ctx ? core_ctx->flush.in_progress : false);
-	spdk_json_write_named_int32(w, "error", core_ctx ? core_ctx->flush.error : 0);
+	spdk_json_write_named_bool(w, "in_progress", core_ctx->flush.in_progress);
+	spdk_json_write_named_int32(w, "error", core_ctx->flush.error);
 	spdk_json_write_object_end(w);
 
 	return rc;

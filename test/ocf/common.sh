@@ -139,16 +139,6 @@ ocf_settled() {
 		return 1
 	fi
 
-	# Check if there are no cores in caches still in the initialization process.
-	# Such condition can happen when base bdevs with OCF metadata were found for
-	# started caches and their configuration is loaded from this metadata in background.
-	if ! ./scripts/rpc.py bdev_ocf_get_bdevs | jq -e \
-		'if (.caches | length == 0) then true
-			else ([.caches[].cores[]] | any(. == {}) | not) end'; then
-
-		return 1
-	fi
-
 	# By using array arithmetic check if there is no attached
 	# cores in wait list that belong to any attached cache.
 	# Those cores should be automatically added to their caches, so if there

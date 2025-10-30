@@ -21,7 +21,8 @@ cleaning_alru_wake_up_time_range=(0 3600)
 cleaning_alru_flush_max_buffers_range=(1 10000)
 cleaning_alru_staleness_time_range=(1 3600)
 cleaning_alru_activity_threshold_range=(0 1000000)
-cleaning_alru_max_dirty_ratio_range=(0 100)
+cleaning_alru_dirty_ratio_threshold_range=(0 100)
+cleaning_alru_dirty_ratio_inertia_range=(0 4095)
 seqcutoff_policies=("always" "full" "never")
 seqcutoff_policy_default="full"
 seqcutoff_threshold_range=(1 4194181)
@@ -464,7 +465,7 @@ set_promotion_nhit_params() {
 }
 
 set_cleaning_alru_params() {
-	if [ $# -ne 5 ]; then
+	if [ $# -ne 6 ]; then
 		echo >&2 "invalid number of arguments"
 		exit 1
 	fi
@@ -473,7 +474,8 @@ set_cleaning_alru_params() {
 	local flush_max_buffers=$2
 	local staleness_time=$3
 	local activity_threshold=$4
-	local max_dirty_ratio=$5
+	local dirty_ratio_threshold=$5
+	local dirty_ratio_inertia=$6
 
 	for i in {1..3}; do
 		$rpc_py bdev_ocf_set_cleaning Ocf_cache$i \
@@ -482,7 +484,8 @@ set_cleaning_alru_params() {
 			--alru-flush-max-buffers $flush_max_buffers \
 			--alru-staleness-time $staleness_time \
 			--alru-activity-threshold $activity_threshold \
-			--alru-max-dirty-ratio $max_dirty_ratio
+			--alru-dirty-ratio-threshold $dirty_ratio_threshold \
+			--alru-dirty-ratio-inertia $dirty_ratio_inertia
 	done
 	$rpc_py bdev_ocf_get_bdevs | jq -e '.'
 }
@@ -750,7 +753,7 @@ __check_promotion_nhit_params() {
 }
 
 __check_cleaning_alru_params() {
-	if [ $# -ne 5 ]; then
+	if [ $# -ne 6 ]; then
 		echo >&2 "invalid number of arguments"
 		exit 1
 	fi
@@ -759,21 +762,24 @@ __check_cleaning_alru_params() {
 	local flush_max_buffers=$2
 	local staleness_time=$3
 	local activity_threshold=$4
-	local max_dirty_ratio=$5
+	local dirty_ratio_threshold=$5
+	local dirty_ratio_inertia=$6
 
 	$rpc_py bdev_ocf_get_bdevs | jq -e \
 		--argjson wake_up_time $wake_up_time \
 		--argjson flush_max_buffers $flush_max_buffers \
 		--argjson staleness_time $staleness_time \
 		--argjson activity_threshold $activity_threshold \
-		--argjson max_dirty_ratio $max_dirty_ratio \
+		--argjson dirty_ratio_threshold $dirty_ratio_threshold \
+		--argjson dirty_ratio_inertia $dirty_ratio_inertia \
 		'[.caches[].cleaning] | all(
 		(.policy == "alru") and
 		(.wake_up_time == $wake_up_time) and
 		(.flush_max_buffers == $flush_max_buffers) and
 		(.staleness_time == $staleness_time) and
 		(.activity_threshold == $activity_threshold) and
-		(.max_dirty_ratio == $max_dirty_ratio))'
+		(.dirty_ratio_threshold == $dirty_ratio_threshold) and
+		(.dirty_ratio_inertia == $dirty_ratio_inertia * 1024 * 1024))'
 }
 
 __check_cleaning_acp_params() {

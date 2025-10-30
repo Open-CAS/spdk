@@ -91,7 +91,8 @@ struct vbdev_ocf_mngt_ctx {
 			int32_t			alru_flush_max_buffers;
 			int32_t			alru_staleness_time;
 			int32_t			alru_activity_threshold;
-			int32_t			alru_max_dirty_ratio;
+			int32_t			alru_dirty_ratio_threshold;
+			int32_t			alru_dirty_ratio_inertia;
 		} cleaning;
 
 		/* Sequential cut-off parameters. */

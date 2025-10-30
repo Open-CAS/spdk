@@ -63,8 +63,8 @@ void vbdev_ocf_set_promotion(const char *cache_name, const char *policy,
 void vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_wake_up_time,
 			    int32_t acp_flush_max_buffers, int32_t alru_wake_up_time,
 			    int32_t alru_flush_max_buffers, int32_t alru_staleness_time,
-			    int32_t alru_activity_threshold, int32_t alru_max_dirty_ratio,
-			    vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg);
+			    int32_t alru_activity_threshold, int32_t alru_dirty_ratio_threshold,
+			    int32_t alru_dirty_ratio_inertia, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg);
 
 void vbdev_ocf_set_seqcutoff(const char *bdev_name, const char *policy, int32_t threshold,
 			     int32_t promotion_count, int32_t promote_on_threshold,

@@ -196,7 +196,7 @@ def add_parser(subparsers):
                    type=int,
                    default=-1)
     p.add_argument('-t', '--nhit-trigger-threshold',
-                   help='cache occupancy value over which NHIT promotion is active (range <0-100> [%]; default 80)',
+                   help='cache occupancy value over which NHIT promotion is active (range <0-100> [%%]; default 80)',
                    type=int,
                    default=-1)
     p.set_defaults(func=bdev_ocf_set_promotion)
@@ -211,7 +211,8 @@ def add_parser(subparsers):
                                        alru_flush_max_buffers=args.alru_flush_max_buffers,
                                        alru_staleness_time=args.alru_staleness_time,
                                        alru_activity_threshold=args.alru_activity_threshold,
-                                       alru_max_dirty_ratio=args.alru_max_dirty_ratio)
+                                       alru_dirty_ratio_threshold=args.alru_dirty_ratio_threshold,
+                                       alru_dirty_ratio_inertia=args.alru_dirty_ratio_inertia)
     p = subparsers.add_parser('bdev_ocf_set_cleaning', help='Set cleaning parameters for OCF cache')
     p.add_argument('cache_name', help='name of the cache vbdev')
     p.add_argument('-p', '--policy',
@@ -244,8 +245,13 @@ def add_parser(subparsers):
                    help='cache idle time before flushing thread can start (range <0-1000000> [ms]; default 10000)',
                    type=int,
                    default=-1)
-    p.add_argument('-d', '--alru-max-dirty-ratio',
-                   help='maximum percentage of cache occupancy at which cleaning is triggered immediately (range <0-100> [%]; default 100)',
+    p.add_argument('-d', '--alru-dirty-ratio-threshold',
+                   help='dirty ratio of the cache device at which cleaning will be triggered (range <0-100> [%%]; default 100)',
+                   type=int,
+                   default=-1)
+    p.add_argument('-i', '--alru-dirty-ratio-inertia',
+                   help='inertia for dirty ratio - cleaning triggered by exceeding dirty ratio threshold will stop \
+                           when dirty ratio drops below (threshold - inertia) (range <0-4095> [MiB]; default 128)',
                    type=int,
                    default=-1)
     p.set_defaults(func=bdev_ocf_set_cleaning)

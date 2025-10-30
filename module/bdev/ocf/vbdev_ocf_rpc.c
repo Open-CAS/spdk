@@ -456,7 +456,8 @@ struct rpc_bdev_ocf_set_cleaning {
 	int32_t alru_flush_max_buffers;
 	int32_t alru_staleness_time;
 	int32_t alru_activity_threshold;
-	int32_t alru_max_dirty_ratio;
+	int32_t alru_dirty_ratio_threshold;
+	int32_t alru_dirty_ratio_inertia;
 };
 
 static void
@@ -475,7 +476,8 @@ static const struct spdk_json_object_decoder rpc_bdev_ocf_set_cleaning_decoders[
 	{"alru_flush_max_buffers", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_flush_max_buffers), spdk_json_decode_int32, true},
 	{"alru_staleness_time", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_staleness_time), spdk_json_decode_int32, true},
 	{"alru_activity_threshold", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_activity_threshold), spdk_json_decode_int32, true},
-	{"alru_max_dirty_ratio", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_max_dirty_ratio), spdk_json_decode_int32, true},
+	{"alru_dirty_ratio_threshold", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_dirty_ratio_threshold), spdk_json_decode_int32, true},
+	{"alru_dirty_ratio_inertia", offsetof(struct rpc_bdev_ocf_set_cleaning, alru_dirty_ratio_inertia), spdk_json_decode_int32, true},
 };
 
 static void
@@ -510,8 +512,8 @@ rpc_bdev_ocf_set_cleaning(struct spdk_jsonrpc_request *request, const struct spd
 	vbdev_ocf_set_cleaning(req.cache_name, req.policy, req.acp_wake_up_time,
 			       req.acp_flush_max_buffers, req.alru_wake_up_time,
 			       req.alru_flush_max_buffers, req.alru_staleness_time,
-			       req.alru_activity_threshold, req.alru_max_dirty_ratio,
-			       rpc_bdev_ocf_set_cleaning_cb, request);
+			       req.alru_activity_threshold, req.alru_dirty_ratio_threshold,
+			       req.alru_dirty_ratio_inertia, rpc_bdev_ocf_set_cleaning_cb, request);
 
 cleanup:
 	free_rpc_bdev_ocf_set_cleaning(&req);

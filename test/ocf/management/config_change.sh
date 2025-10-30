@@ -95,9 +95,10 @@ for cleaning_policy in "${cleaning_policies[@]}"; do
 				flush_max_buffers=$(random_number ${cleaning_alru_flush_max_buffers_range[0]} ${cleaning_alru_flush_max_buffers_range[1]})
 				staleness_time=$(random_number ${cleaning_alru_staleness_time_range[0]} ${cleaning_alru_staleness_time_range[1]})
 				activity_threshold=$(random_number ${cleaning_alru_activity_threshold_range[0]} ${cleaning_alru_activity_threshold_range[1]})
-				max_dirty_ratio=$(random_number ${cleaning_alru_max_dirty_ratio_range[0]} ${cleaning_alru_max_dirty_ratio_range[1]})
-				set_cleaning_alru_params $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
-				__check_cleaning_alru_params $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $max_dirty_ratio
+				dirty_ratio_threshold=$(random_number ${cleaning_alru_dirty_ratio_threshold_range[0]} ${cleaning_alru_dirty_ratio_threshold_range[1]})
+				dirty_ratio_inertia=$(random_number ${cleaning_alru_dirty_ratio_inertia_range[0]} ${cleaning_alru_dirty_ratio_inertia_range[1]})
+				set_cleaning_alru_params $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $dirty_ratio_threshold $dirty_ratio_inertia
+				__check_cleaning_alru_params $wake_up_time $flush_max_buffers $staleness_time $activity_threshold $dirty_ratio_threshold $dirty_ratio_inertia
 			elif [ $cleaning_policy == acp ]; then
 				wake_up_time=$(random_number ${cleaning_acp_wake_up_time_range[0]} ${cleaning_acp_wake_up_time_range[1]})
 				flush_max_buffers=$(random_number ${cleaning_acp_flush_max_buffers_range[0]} ${cleaning_acp_flush_max_buffers_range[1]})

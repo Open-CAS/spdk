@@ -2206,10 +2206,27 @@ _cleaning_lock_cb(ocf_cache_t cache, void *cb_arg, int error)
 		}
 	}
 
-	if (mngt_ctx->u.cleaning.alru_max_dirty_ratio >= 0) {
-		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_max_dirty_ratio,
-				mngt_ctx->u.cleaning.alru_max_dirty_ratio))) {
-			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_max_dirty_ratio param (OCF error: %d)\n",
+	if (mngt_ctx->u.cleaning.alru_dirty_ratio_threshold >= 0) {
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru,
+				ocf_alru_dirty_ratio_threshold, mngt_ctx->u.cleaning.alru_dirty_ratio_threshold))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_dirty_ratio_threshold param (OCF error: %d)\n",
+				    ocf_cache_get_name(cache), rc);
+			goto err_param;
+		}
+	}
+
+	if (mngt_ctx->u.cleaning.alru_dirty_ratio_inertia >= 0) {
+		/* Maximum value of dirty ratio inertia is the size of unsigned int,
+		 * so check its value to prevent exceeding before even sending it to OCF. */
+		if (mngt_ctx->u.cleaning.alru_dirty_ratio_inertia * MiB > OCF_ALRU_MAX_DIRTY_RATIO_INERTIA) {
+			SPDK_ERRLOG("OCF cache '%s': alru_dirty_ratio_inertia param out of range\n",
+				    ocf_cache_get_name(cache));
+			rc = -EINVAL;
+			goto err_param;
+		}
+		if ((rc = ocf_mngt_cache_cleaning_set_param(cache, ocf_cleaning_alru, ocf_alru_dirty_ratio_inertia,
+				mngt_ctx->u.cleaning.alru_dirty_ratio_inertia * MiB))) {
+			SPDK_ERRLOG("OCF cache '%s': failed to set cleaning alru_dirty_ratio_inertia param (OCF error: %d)\n",
 				    ocf_cache_get_name(cache), rc);
 			goto err_param;
 		}
@@ -2240,8 +2257,8 @@ void
 vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_wake_up_time,
 		       int32_t acp_flush_max_buffers, int32_t alru_wake_up_time,
 		       int32_t alru_flush_max_buffers, int32_t alru_staleness_time,
-		       int32_t alru_activity_threshold, int32_t alru_max_dirty_ratio,
-		       vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
+		       int32_t alru_activity_threshold, int32_t alru_dirty_ratio_threshold,
+		       int32_t alru_dirty_ratio_inertia, vbdev_ocf_rpc_mngt_cb rpc_cb_fn, void *rpc_cb_arg)
 {
 	ocf_cache_t cache;
 	struct vbdev_ocf_mngt_ctx *mngt_ctx;
@@ -2278,7 +2295,8 @@ vbdev_ocf_set_cleaning(const char *cache_name, const char *policy, int32_t acp_w
 	mngt_ctx->u.cleaning.alru_flush_max_buffers = alru_flush_max_buffers;
 	mngt_ctx->u.cleaning.alru_staleness_time = alru_staleness_time;
 	mngt_ctx->u.cleaning.alru_activity_threshold = alru_activity_threshold;
-	mngt_ctx->u.cleaning.alru_max_dirty_ratio = alru_max_dirty_ratio;
+	mngt_ctx->u.cleaning.alru_dirty_ratio_threshold = alru_dirty_ratio_threshold;
+	mngt_ctx->u.cleaning.alru_dirty_ratio_inertia = alru_dirty_ratio_inertia;
 
 	ocf_mngt_cache_lock(cache, _cleaning_lock_cb, mngt_ctx);
 
@@ -2857,10 +2875,16 @@ dump_cleaning_info(struct spdk_json_write_ctx *w, ocf_cache_t cache)
 		spdk_json_write_named_uint32(w, "activity_threshold", param_val);
 
 		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
-				ocf_alru_max_dirty_ratio, &param_val))) {
+				ocf_alru_dirty_ratio_threshold, &param_val))) {
 			return rc;
 		}
-		spdk_json_write_named_uint32(w, "max_dirty_ratio", param_val);
+		spdk_json_write_named_uint32(w, "dirty_ratio_threshold", param_val);
+
+		if ((rc = ocf_mngt_cache_cleaning_get_param(cache, ocf_cleaning_alru,
+				ocf_alru_dirty_ratio_inertia, &param_val))) {
+			return rc;
+		}
+		spdk_json_write_named_uint32(w, "dirty_ratio_inertia", param_val);
 	}
 
 	return 0;

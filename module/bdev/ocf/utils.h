@@ -1,5 +1,6 @@
 /*   SPDX-License-Identifier: BSD-3-Clause
  *   Copyright (C) 2018 Intel Corporation.
+ *   Copyright (C) 2025 Huawei Technologies
  *   All rights reserved.
  */
 
@@ -7,39 +8,29 @@
 #define VBDEV_OCF_UTILS_H
 
 #include <ocf/ocf.h>
-#include "vbdev_ocf.h"
 
-ocf_cache_mode_t ocf_get_cache_mode(const char *cache_mode);
-const char *ocf_get_cache_modename(ocf_cache_mode_t mode);
+/* Get OCF cache mode by its name. */
+ocf_cache_mode_t vbdev_ocf_cachemode_get_by_name(const char *cache_mode_name);
 
-/* Get cache line size in KiB units */
-int ocf_get_cache_line_size(ocf_cache_t cache);
+/* Get the name of OCF cache mode. */
+const char *vbdev_ocf_cachemode_get_name(ocf_cache_mode_t cache_mode);
 
-/* Get sequential cutoff policy by name */
-ocf_seq_cutoff_policy ocf_get_seqcutoff_policy(const char *policy_name);
+/* Get OCF promotion policy by its name. */
+ocf_promotion_t vbdev_ocf_promotion_policy_get_by_name(const char *policy_name);
 
-/* Initiate management operation
- * Receives NULL terminated array of functions (path)
- * and callback (cb)
- * and callback argument (cb_arg)
- * This function may fail with ENOMEM or EBUSY */
-int vbdev_ocf_mngt_start(struct vbdev_ocf *vbdev, vbdev_ocf_mngt_fn *path,
-			 vbdev_ocf_mngt_callback cb, void *cb_arg);
+/* Get the name of OCF promotion policy. */
+const char *vbdev_ocf_promotion_policy_get_name(ocf_promotion_t policy);
 
-/* Continue execution with polling operation (fn)
- * fn must invoke vbdev_ocf_mngt_continue() to stop polling
- * Poller has default timeout of 5 seconds */
-void vbdev_ocf_mngt_poll(struct vbdev_ocf *vbdev, vbdev_ocf_mngt_fn fn);
+/* Get OCF cleaning policy by its name. */
+ocf_cleaning_t vbdev_ocf_cleaning_policy_get_by_name(const char *policy_name);
 
-/* Continue execution with next function that is on path
- * If next function is NULL, finish management operation and invoke callback */
-void vbdev_ocf_mngt_continue(struct vbdev_ocf *vbdev, int status);
+/* Get the name of OCF cleaning policy. */
+const char *vbdev_ocf_cleaning_policy_get_name(ocf_cleaning_t policy);
 
-/* Stop the execution, if status is non zero set it,
- * if rollback function is not null invoke rollback
- * else invoke callback with last status returned */
-void vbdev_ocf_mngt_stop(struct vbdev_ocf *vbdev, vbdev_ocf_mngt_fn *rollback_path, int status);
+/* Get OCF sequential cut-off policy by its name. */
+ocf_seq_cutoff_policy vbdev_ocf_seqcutoff_policy_get_by_name(const char *policy_name);
 
-/* Get status */
-int vbdev_ocf_mngt_get_status(struct vbdev_ocf *vbdev);
+/* Get the name of OCF sequential cut-off policy. */
+const char *vbdev_ocf_seqcutoff_policy_get_name(ocf_seq_cutoff_policy policy);
+
 #endif

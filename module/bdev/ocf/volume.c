@@ -1,5 +1,6 @@
 /*   SPDX-License-Identifier: BSD-3-Clause
  *   Copyright (C) 2019 Intel Corporation.
+ *   Copyright (C) 2025 Huawei Technologies
  *   All rights reserved.
  */
 
@@ -7,30 +8,26 @@
 
 #include "spdk/bdev_module.h"
 #include "spdk/env.h"
-#include "spdk/thread.h"
 #include "spdk/log.h"
+#include "spdk/string.h"
+#include "spdk/thread.h"
 
+#include "vbdev_ocf_core.h"
 #include "data.h"
 #include "volume.h"
 #include "ctx.h"
-#include "vbdev_ocf.h"
 
+/* TODO?: refactor (like ocf_core_volume in ocf_core.c ?) */
 static int
 vbdev_ocf_volume_open(ocf_volume_t volume, void *opts)
 {
 	struct vbdev_ocf_base **priv = ocf_volume_get_priv(volume);
-	struct vbdev_ocf_base *base;
 
 	if (opts) {
-		base = opts;
-	} else {
-		base = vbdev_ocf_get_base_by_name(ocf_volume_get_uuid(volume)->data);
-		if (base == NULL) {
-			return -ENODEV;
-		}
+		*priv = opts;
 	}
 
-	*priv = base;
+	assert(*priv);
 
 	return 0;
 }
@@ -125,18 +122,18 @@ vbdev_forward_get_channel(ocf_volume_t volume, ocf_forward_token_t token)
 		*((struct vbdev_ocf_base **)
 		  ocf_volume_get_priv(volume));
 	ocf_queue_t queue = ocf_forward_get_io_queue(token);
-	struct vbdev_ocf_qctx *qctx;
+	struct vbdev_ocf_core_io_channel_ctx *ch_ctx;
 
 	if (unlikely(ocf_queue_is_mngt(queue))) {
-		return base->management_channel;
+		return base->mngt_ch;
 	}
 
-	qctx = ocf_queue_get_priv(queue);
-	if (unlikely(qctx == NULL)) {
+	ch_ctx = ocf_queue_get_priv(queue);
+	if (unlikely(ch_ctx == NULL)) {
 		return NULL;
 	}
 
-	return (base->is_cache) ? qctx->cache_ch : qctx->core_ch;
+	return (base->is_cache) ? ch_ctx->cache_ch : ch_ctx->core_ch;
 }
 
 static void
@@ -147,12 +144,18 @@ vbdev_forward_io(ocf_volume_t volume, ocf_forward_token_t token,
 	struct vbdev_ocf_base *base =
 		*((struct vbdev_ocf_base **)
 		  ocf_volume_get_priv(volume));
-	struct bdev_ocf_data *data = ocf_forward_get_data(token);
+	struct vbdev_ocf_data *data = ocf_forward_get_data(token);
 	struct spdk_io_channel *ch;
 	spdk_bdev_io_completion_cb cb = vbdev_forward_io_cb;
 	bool iovs_allocated = false;
 	int iovcnt, skip, status = -1;
 	struct iovec *iovs;
+
+	if (!base->attached) {
+		SPDK_ERRLOG("Base bdev '%s' not attached\n", base->name);
+		ocf_forward_end(token, -ENXIO);
+		return;
+	}
 
 	ch = vbdev_forward_get_channel(volume, token);
 	if (unlikely(ch == NULL)) {
@@ -214,6 +217,12 @@ vbdev_forward_flush(ocf_volume_t volume, ocf_forward_token_t token)
 	struct spdk_io_channel *ch;
 	uint64_t bytes = base->bdev->blockcnt * base->bdev->blocklen;
 	int status;
+
+	/* If base device doesn't support flush just ignore it and exit. */
+	if (unlikely(!spdk_bdev_io_type_supported(base->bdev, SPDK_BDEV_IO_TYPE_FLUSH))) {
+		ocf_forward_end(token, 0);
+		return;
+	}
 
 	ch = vbdev_forward_get_channel(volume, token);
 	if (unlikely(ch == NULL)) {
@@ -282,7 +291,7 @@ vbdev_forward_io_simple(ocf_volume_t volume, ocf_forward_token_t token,
 	struct vbdev_ocf_base *base =
 		*((struct vbdev_ocf_base **)
 		  ocf_volume_get_priv(volume));
-	struct bdev_ocf_data *data = ocf_forward_get_data(token);
+	struct vbdev_ocf_data *data = ocf_forward_get_data(token);
 	struct vbdev_forward_io_simple_ctx *ctx;
 	int status = -1;
 
@@ -338,6 +347,35 @@ static struct ocf_volume_properties vbdev_volume_props = {
 		.forward_io_simple = vbdev_forward_io_simple,
 	},
 };
+
+static void
+_base_detach(void *ctx)
+{
+	struct vbdev_ocf_base *base = ctx;
+
+	spdk_put_io_channel(base->mngt_ch);
+	spdk_bdev_close(base->desc);
+}
+
+void
+vbdev_ocf_base_detach(struct vbdev_ocf_base *base)
+{
+	int rc;
+
+	if (base->thread && base->thread != spdk_get_thread()) {
+		if ((rc = spdk_thread_send_msg(base->thread, _base_detach, base))) {
+			SPDK_ERRLOG("OCF '%s': failed to send message to thread (name: %s, id: %ld): %s\n",
+				    base->name,
+				    spdk_thread_get_name(base->thread),
+				    spdk_thread_get_id(base->thread),
+				    spdk_strerror(-rc));
+			assert(false);
+		}
+	} else {
+		_base_detach(base);
+	}
+	base->attached = false;
+}
 
 int
 vbdev_ocf_volume_init(void)

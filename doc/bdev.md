@@ -311,32 +311,57 @@ To delete an aio bdev use the bdev_aio_delete command.
 
 `rpc.py bdev_aio_delete aio0`
 
-## OCF Virtual bdev {#bdev_config_cas}
+## OCF Virtual bdev {#bdev_config_ocf}
 
-OCF virtual bdev module is based on [Open CAS Framework](https://github.com/Open-CAS/ocf) - a
-high performance block storage caching meta-library.
+OCF virtual bdev module is based on [Open CAS Framework](https://github.com/Open-CAS/ocf) - a high performance block storage caching meta-library.<br>
 To enable the module, configure SPDK using `--with-ocf` flag.
 OCF bdev can be used to enable caching for any underlying bdev.
 
-Below is an example command for creating OCF bdev:
+To use OCF caching, first we need to create a caching device:
 
-`rpc.py bdev_ocf_create Cache1 wt Malloc0 Nvme0n1`
+`rpc.py bdev_ocf_start_cache Ocf_cache0 Malloc0`
 
-This command will create new OCF bdev `Cache1` having bdev `Malloc0` as caching-device
-and `Nvme0n1` as core-device and initial cache mode `Write-Through`.
-`Malloc0` will be used as cache for `Nvme0n1`, so  data written to `Cache1` will be present
-on `Nvme0n1` eventually.
-By default, OCF will be configured with cache line size equal 4KiB
-and non-volatile metadata will be disabled.
+This will start OCF cache **Ocf_cache0** using **Malloc0** as a caching device. **Ocf_cache0** will be used internally by OCF and will not be exposed as an SPDK bdev.
 
-To remove `Cache1`:
+Then we can add a storage (core) device to our cache:
 
-`rpc.py bdev_ocf_delete Cache1`
+`rpc.py bdev_ocf_add_core Ocf_core0 Nvme0n1 Ocf_cache0`
 
-During removal OCF-cache will be stopped and all cached data will be written to the core device.
+This will add **Ocf_core0** to previously created cache instance **Ocf_cache0** using **Nvme0n1** as core device.
+**Ocf_core0** on the other hand, will be registered in the SPDK bdev layer and will be available for usage as any other SPDK bdev.
+(You can add up to 4096 core devices to a single cache instance.)<br>
+In such configuration **Malloc0** will be used as cache for **Nvme0n1**,
+so data written to **Ocf_core0** will be present on **Nvme0n1** eventually, depending on chosen cache mode.<br>
+By default, OCF will be configured with Write-Through cache mode, 4KiB cache line size and loading of previous configuration if OCF metadata is present on the cache device.
+You can change those parameters when creating cache with `bdev_ocf_start_cache`. In addition, cache mode can also be changed in runtime using `bdev_ocf_set_cachemode`.<br>
+There are also other caching parameters to tweak (including: promotion, cleaning or sequential stream cut-off),
+as well as issuing manual flushing of dirty data or dumping OCF statistics.
 
-Note that OCF has a per-device RAM requirement. More details can be found in the
-[OCF documentation](https://open-cas.github.io/guide_system_requirements.html).
+To remove particular core device:
+
+`rpc.py bdev_ocf_remove_core Ocf_core0`
+
+To stop the whole OCF cache (and remove all of its core devices):
+
+`rpc.py bdev_ocf_stop_cache Ocf_cache0`
+
+During core removal or cache stop all cached data will be written (flushed) to the core device first.
+
+A few things to mention:
+
+- If cache's base bdev contains OCF metadata from previous runs, cache configuration will be loaded from the metadata, unless the no-load flag is specified.
+  This configuration includes all the cores that were added to this cache before it was stopped.
+  Those cores however will be added only as a place holders with a "loading" status until manually added to cache with `bdev_ocf_add_core`.
+  Also, the cache itself will be in incomplete state until all of its cores are added. This behavior has two reasons.
+  First and foremost, it prevents data corruption in case an arbitrary bdev is automatically added as a core device just because of a matching name.
+  And second, it allows for the same JSON bdev config either it's loading or starting a new cache. Such incomplete cache state might also be desired,
+  e.g. to just inspect which cores were previously added to cache.
+
+- When the core device is added using `bdev_ocf_add_core` but its base bdev or cache bdev is not present yet (or cache is in detached state - no base bdev),
+  it is put on a temporary core wait list. Such core will be automatically moved from this wait list to the cache once its base bdev is created and its cache is up and running.
+  This means that all constructing operations can be issued in any order and the outcome should always be the same.
+
+- OCF has a per-device RAM requirement. More details can be found in the [OCF documentation](https://open-cas.github.io/guide_system_requirements.html).
 
 ## Malloc bdev {#bdev_config_malloc}
 

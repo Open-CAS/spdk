@@ -368,9 +368,9 @@ env_rwsem_destroy(env_rwsem *s)
 
 /* *** ATOMIC VARIABLES *** */
 
-typedef int env_atomic;
-
-typedef long env_atomic64;
+typedef int	env_atomic;
+typedef uint8_t	env_atomic8;
+typedef long	env_atomic64;
 
 #ifndef atomic_read
 #define atomic_read(ptr)       (*(__typeof__(*ptr) *volatile) (ptr))
@@ -481,6 +481,54 @@ env_atomic_add_unless(env_atomic *a, int i, int u)
 			break;
 		}
 		old = env_atomic_cmpxchg((a), c, c + (i));
+		if (spdk_likely(old == c)) {
+			break;
+		}
+		c = old;
+	}
+	return c != (u);
+}
+
+static inline uint8_t
+env_atomic8_read(const env_atomic8 *a)
+{
+	return atomic_read(a);
+}
+
+static inline void
+env_atomic8_set(env_atomic8 *a, uint8_t i)
+{
+	atomic_set(a, i);
+}
+
+static inline void
+env_atomic8_sub(uint8_t i, env_atomic8 *a)
+{
+	atomic_sub(a, i);
+}
+
+static inline void
+env_atomic8_dec(env_atomic8 *a)
+{
+	atomic_dec(a);
+}
+
+static inline uint8_t
+env_atomic8_cmpxchg(env_atomic8 *a, uint8_t old, uint8_t new)
+{
+	return atomic_cmpxchg(a, old, new);
+}
+
+static inline uint8_t
+env_atomic8_add_unless(env_atomic8 *a, uint8_t i, uint8_t u)
+{
+	uint8_t c, old;
+	c = env_atomic8_read(a);
+	for (;;) {
+		if (spdk_unlikely(c == (u))) {
+			break;
+		}
+		old = env_atomic8_cmpxchg((a), c, c + (i));
 		if (spdk_likely(old == c)) {
 			break;
 		}

@@ -1192,96 +1192,211 @@
       ]
     },
     {
-      "name": "bdev_ocf_create",
+      "name": "bdev_ocf_start_cache",
       "params": [
         {
-          "name": "name",
+          "name": "cache_name",
           "type": "string",
           "required": true,
-          "description": "Bdev name to use"
+          "description": "name for the new OCF cache vbdev"
         },
         {
-          "name": "mode",
+          "name": "base_name",
           "type": "string",
           "required": true,
-          "description": "OCF cache mode: wb, wt, pt, wa, wi, wo"
+          "description": "name of the base bdev to use as cache"
+        },
+        {
+          "name": "cache_mode",
+          "type": "string",
+          "description": "choose between {wt|wb|wa|wo|wi|pt}; default wt (Write-Through)"
         },
         {
           "name": "cache_line_size",
-          "type": "uint64",
-          "description": "OCF cache line size in KiB: 4, 8, 16, 32, 64"
+          "type": "uint32",
+          "description": "choose between {4|8|16|32|64} * KiB; default 4096"
         },
         {
-          "name": "cache_bdev_name",
+          "name": "no_load",
+          "type": "boolean",
+          "description": "do not load previous cache instance from metadata and force starting a new one instead (WARNING: all cache metadata will be discarded!)"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_stop_cache",
+      "params": [
+        {
+          "name": "cache_name",
           "type": "string",
           "required": true,
-          "description": "Name of underlying cache bdev"
+          "description": "name of the cache vbdev to stop"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_detach_cache",
+      "params": [
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev to detach device from"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_attach_cache",
+      "params": [
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev to attach device to"
         },
         {
-          "name": "core_bdev_name",
+          "name": "base_name",
           "type": "string",
           "required": true,
-          "description": "Name of underlying core bdev"
-        }
-      ]
-    },
-    {
-      "name": "bdev_ocf_delete",
-      "params": [
-        {
-          "name": "name",
-          "type": "string",
-          "required": true,
-          "description": "Bdev name"
-        }
-      ]
-    },
-    {
-      "name": "bdev_ocf_get_stats",
-      "params": [
-        {
-          "name": "name",
-          "type": "string",
-          "required": true,
-          "description": "Block device name"
-        }
-      ]
-    },
-    {
-      "name": "bdev_ocf_reset_stats",
-      "params": [
-        {
-          "name": "name",
-          "type": "string",
-          "required": true,
-          "description": "Block device name"
-        }
-      ]
-    },
-    {
-      "name": "bdev_ocf_get_bdevs",
-      "params": [
-        {
-          "name": "name",
-          "type": "string",
-          "description": "Name of OCF vbdev or name of cache device or name of core device"
-        }
-      ]
-    },
-    {
-      "name": "bdev_ocf_set_cache_mode",
-      "params": [
-        {
-          "name": "name",
-          "type": "string",
-          "required": true,
-          "description": "Bdev name"
+          "description": "name of the base bdev to use as caching device"
         },
         {
-          "name": "mode",
+          "name": "force",
+          "type": "boolean",
+          "description": "discard cache metadata if present on device"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_add_core",
+      "params": [
+        {
+          "name": "core_name",
           "type": "string",
           "required": true,
-          "description": "OCF cache mode: wb, wt, pt, wa, wi, wo"
+          "description": "name for the new OCF core vbdev"
+        },
+        {
+          "name": "base_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the base bdev to use as core"
+        },
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev to add this core to"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_remove_core",
+      "params": [
+        {
+          "name": "core_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the core vbdev to remove from OCF cache instance"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_set_cachemode",
+      "params": [
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev"
+        },
+        {
+          "name": "cache_mode",
+          "type": "string",
+          "required": true,
+          "description": "choose between {wt|wb|wa|wo|wi|pt} (Write-Through, Write-Back, Write-Around, Write-Only, Write-Invalidate, Pass-Through); default wt"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_set_promotion",
+      "params": [
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev"
+        },
+        {
+          "name": "policy",
+          "type": "string",
+          "description": "promotion policy (choose between {always|nhit}; default always)"
+        },
+        {
+          "name": "nhit_insertion_threshold",
+          "type": "int32",
+          "description": "number of requests for given core line after which NHIT policy allows insertion into cache (range <2-1000>; default 3)"
+        },
+        {
+          "name": "nhit_trigger_threshold",
+          "type": "int32",
+          "description": "cache occupancy value over which NHIT promotion is active (range <0-100> [%]; default 80)"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_set_cleaning",
+      "params": [
+        {
+          "name": "cache_name",
+          "type": "string",
+          "required": true,
+          "description": "name of the cache vbdev"
+        },
+        {
+          "name": "policy",
+          "type": "string",
+          "description": "cleaning policy (choose between {acp|alru|nop}; default alru)"
+        },
+        {
+          "name": "acp_wake_up_time",
+          "type": "int32",
+          "description": "time between ACP cleaning thread iterations (range <0-10000> [ms]; default 10)"
+        },
+        {
+          "name": "acp_flush_max_buffers",
+          "type": "int32",
+          "description": "number of dirty cache lines to be flushed in a single ACP cleaning thread iteration (range <1-10000>; default 128)"
+        },
+        {
+          "name": "alru_wake_up_time",
+          "type": "int32",
+          "description": "cleaning thread sleep time after an idle wake up (range <0-3600> [s]; default 20)"
+        },
+        {
+          "name": "alru_flush_max_buffers",
+          "type": "int32",
+          "description": "number of dirty cache lines to be flushed in one cleaning cycle (range <1-10000>; default 100)"
+        },
+        {
+          "name": "alru_staleness_time",
+          "type": "int32",
+          "description": "time that has to pass from the last write operation before a dirty cache line can be scheduled to be flushed (range <1-3600> [s]; default 120)"
+        },
+        {
+          "name": "alru_activity_threshold",
+          "type": "int32",
+          "description": "cache idle time before flushing thread can start (range <0-1000000> [ms]; default 10000)"
+        },
+        {
+          "name": "alru_dirty_ratio_threshold",
+          "type": "int32",
+          "description": "dirty ratio of the cache device at which cleaning will be triggered (range <0-100> [%]; default 100)"
+        },
+        {
+          "name": "alru_dirty_ratio_inertia",
+          "type": "int32",
+          "description": "inertia for dirty ratio - cleaning triggered by exceeding dirty ratio threshold will stop when dirty ratio drops below (threshold - inertia) (range <0-4095> [MiB]; default 128)"
         }
       ]
     },
@@ -1289,26 +1404,30 @@
       "name": "bdev_ocf_set_seqcutoff",
       "params": [
         {
-          "name": "name",
+          "name": "bdev_name",
           "type": "string",
           "required": true,
-          "description": "Bdev name"
+          "description": "name of OCF vbdev"
         },
         {
           "name": "policy",
           "type": "string",
-          "required": true,
-          "description": "Sequential cutoff policy: always, full, never"
+          "description": "sequential cut-off policy (choose between {always|full|never}; default full)"
         },
         {
           "name": "threshold",
-          "type": "uint32",
-          "description": "Activation threshold in KiB"
+          "type": "int32",
+          "description": "activation threshold (range <1-4194181> [KiB]; default 1)"
         },
         {
           "name": "promotion_count",
-          "type": "uint32",
-          "description": "Promotion request count"
+          "type": "int32",
+          "description": "request count threshold for cutting off the sequential stream (range <1-65535>; default 8)"
+        },
+        {
+          "name": "promote_on_threshold",
+          "type": "int32",
+          "description": "whether to promote core sequential cut-off stream to global structures when threshold is reached (choose between {0|1}; default 0)"
         }
       ]
     },
@@ -1316,21 +1435,42 @@
       "name": "bdev_ocf_flush_start",
       "params": [
         {
-          "name": "name",
+          "name": "bdev_name",
           "type": "string",
           "required": true,
-          "description": "Bdev name"
+          "description": "name of OCF vbdev to flush"
         }
       ]
     },
     {
-      "name": "bdev_ocf_flush_status",
+      "name": "bdev_ocf_get_stats",
       "params": [
         {
-          "name": "name",
+          "name": "bdev_name",
           "type": "string",
           "required": true,
-          "description": "Bdev name"
+          "description": "name of OCF vbdev"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_reset_stats",
+      "params": [
+        {
+          "name": "bdev_name",
+          "type": "string",
+          "required": true,
+          "description": "name of OCF vbdev"
+        }
+      ]
+    },
+    {
+      "name": "bdev_ocf_get_bdevs",
+      "params": [
+        {
+          "name": "bdev_name",
+          "type": "string",
+          "description": "optional name of specific OCF vbdev (shows all by default)"
         }
       ]
     },

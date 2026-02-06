@@ -1,16 +1,25 @@
 /*   SPDX-License-Identifier: BSD-3-Clause
  *   Copyright (C) 2018 Intel Corporation.
+ *   Copyright (C) 2025 Huawei Technologies
  *   All rights reserved.
  */
 
-#ifndef VBDEV_OCF_DOBJ_H
-#define VBDEV_OCF_DOBJ_H
+#ifndef VBDEV_OCF_VOLUME_H
+#define VBDEV_OCF_VOLUME_H
 
-#include <ocf/ocf.h>
+#define VBDEV_OCF_BDEV_NAME_SIZE spdk_max(OCF_CACHE_NAME_SIZE, OCF_CORE_NAME_SIZE)
 
-#include "ctx.h"
-#include "data.h"
+struct vbdev_ocf_base {
+	char			name[VBDEV_OCF_BDEV_NAME_SIZE];
+	bool			is_cache;
+	bool			attached;
+	struct spdk_bdev	*bdev;
+	struct spdk_bdev_desc	*desc;
+	struct spdk_io_channel	*mngt_ch;
+	struct spdk_thread	*thread;
+};
 
+void vbdev_ocf_base_detach(struct vbdev_ocf_base *base);
 int vbdev_ocf_volume_init(void);
 void vbdev_ocf_volume_cleanup(void);
 

@@ -1,0 +1,294 @@
+{
+  "cores_waitlist": [
+    {
+      "name": "Ocf_core_waitlist1",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist1",
+      "base_attached": false,
+      "size": null,
+      "block_size": null
+    },
+    {
+      "name": "Ocf_core_waitlist2",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist2",
+      "base_attached": true,
+      "size": 209715200,
+      "block_size": 512
+    },
+    {
+      "name": "Ocf_core_waitlist3",
+      "cache_name": "Ocf_cache_none",
+      "base_name": "Core_dev_waitlist3",
+      "base_attached": true,
+      "size": 209715200,
+      "block_size": 512
+    }
+  ],
+  "caches": [
+    {
+      "name": "Ocf_cache1",
+      "base_name": "Cache_dev1",
+      "base_attached": false,
+      "size": null,
+      "block_size": null,
+      "cache_line_size": 4096,
+      "cache_mode": "wt",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "dirty_ratio_threshold": 100,
+        "dirty_ratio_inertia": 134217728
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core1-1",
+          "uuid": "0be66590-b2b0-58cf-8dde-aa8ed86ee223",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-1",
+          "base_attached": false,
+          "size": null,
+          "block_size": null,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core1-2",
+          "uuid": "7ae5d5b1-f2b8-56e6-838e-d6c3e4e4a52d",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core1-3",
+          "uuid": "6d587297-39c4-5e4b-899b-faa488c5a976",
+          "cache_name": "Ocf_cache1",
+          "base_name": "Core_dev1-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ocf_cache2",
+      "base_name": "Cache_dev2",
+      "base_attached": true,
+      "size": 104857600,
+      "block_size": 512,
+      "cache_line_size": 4096,
+      "cache_mode": "wb",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "dirty_ratio_threshold": 100,
+        "dirty_ratio_inertia": 134217728
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core2-1",
+          "uuid": "a3dbab70-2366-5a7b-a22d-a5f27f958fde",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-1",
+          "base_attached": false,
+          "size": null,
+          "block_size": null,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core2-2",
+          "uuid": "089e4715-908c-5635-8ff7-e45ce42f0b2b",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core2-3",
+          "uuid": "373d6301-3d56-5261-b0bd-dd959c48aa3e",
+          "cache_name": "Ocf_cache2",
+          "base_name": "Core_dev2-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    },
+    {
+      "name": "Ocf_cache3",
+      "base_name": "Cache_dev3",
+      "base_attached": true,
+      "size": 104857600,
+      "block_size": 512,
+      "cache_line_size": 65536,
+      "cache_mode": "pt",
+      "promotion": {
+        "policy": "always"
+      },
+      "cleaning": {
+        "policy": "alru",
+        "wake_up_time": 20,
+        "flush_max_buffers": 100,
+        "staleness_time": 120,
+        "activity_threshold": 10000,
+        "dirty_ratio_threshold": 100,
+        "dirty_ratio_inertia": 134217728
+      },
+      "flush": {
+        "in_progress": false,
+        "error": 0
+      },
+      "cores_count": 3,
+      "cores": [
+        {
+          "name": "Ocf_core3-1",
+          "uuid": "b3c4e428-b6cb-572d-98bf-33d192ba4a62",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-1",
+          "base_attached": false,
+          "size": null,
+          "block_size": null,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core3-2",
+          "uuid": "7c321a44-f6b1-5af3-9ce3-2088fa529566",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-2",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        },
+        {
+          "name": "Ocf_core3-3",
+          "uuid": "5cfe8234-1fd5-5b73-9026-9214652a4475",
+          "cache_name": "Ocf_cache3",
+          "base_name": "Core_dev3-3",
+          "base_attached": true,
+          "size": 209715200,
+          "block_size": 512,
+          "loading": false,
+          "seq_cutoff": {
+            "policy": "full",
+            "threshold": 1024,
+            "promotion_count": 8,
+            "promote_on_threshold": false
+          },
+          "flush": {
+            "in_progress": false,
+            "error": 0
+          }
+        }
+      ]
+    }
+  ]
+}
